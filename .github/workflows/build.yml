@@ -1,0 +1,48 @@
+name: Build FontShelf
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish (single-file .exe)
+        run: >
+          dotnet publish src/FontShelf/FontShelf.csproj -c Release -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          -p:DebugType=none
+          -p:Version=1.0.${{ github.run_number }}
+          -o out
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FontShelf
+          path: out/FontShelf.exe
+
+      - name: Create release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="build-${{ github.run_number }}"
+          MSG="$(git log -1 --pretty=%s)"
+          gh release create "$TAG" out/FontShelf.exe \
+            --title "FontShelf build ${{ github.run_number }}" \
+            --notes "$MSG" \
+            --latest
