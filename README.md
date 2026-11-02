@@ -4,12 +4,16 @@ Upravitelj fontova za Windows, po uzoru na Typeface s Maca.
 
 ## Što radi
 
-- **Pregled i pretraga** — svi instalirani fontovi s tvojim probnim tekstom i podesivom veličinom; pretraga po imenu i tagovima (Ctrl+F)
-- **Favoriti i tagovi** — označi fontove zvjezdicom i dodaj im vlastite tagove (npr. „logo”, „meni”); tagovi su u bočnoj traci kao kolekcije
-- **Usporedba** — dodaj fontove u usporedbu i vidi isti tekst jedan do drugoga
-- **Glifovi** — mreža svih znakova fonta, klik za veliki prikaz i kopiranje znaka ili koda
-- **Pametni filtri** — monospace fontovi i fontovi koji imaju sva hrvatska slova (č ć đ š ž)
-- **Mape i aktivacija** — dodaj mapu s fontovima (ili je povuci u prozor), pregledaj ih bez instalacije i aktiviraj jednim klikom da budu dostupni u svim aplikacijama; „Instaliraj trajno” ih instalira za tvoj korisnički račun bez administratorskih prava
+- **Pregled i pretraga**: svi fontovi s tvojim tekstom, veličinom i prikazom kao redak, odlomak ili abeceda; pretraga po imenu, tagu i dizajneru (Ctrl+F)
+- **Prikazi**: popis, mreža i tablica s metapodacima (verzija, dizajner, proizvođač…); sortiranje po imenu, broju stilova, datumu dodavanja ili favoritima
+- **Favoriti i tagovi**: kolekcije u bočnoj traci, izvoz svih fontova s tagom u mapu
+- **Usporedba**: stupci, preklapanje A/B i par naslov + tekst (pairing)
+- **Tester**: OpenType značajke (ligature, stilski setovi, brojke…) i klizači za varijabilne osi
+- **Glifovi**: svi znakovi; kopiranje znaka, koda ili svih znakova, izvoz znaka kao SVG ili PNG
+- **Pametni filtri**: monospace, varijabilni, hrvatski znakovi (č ć đ š ž), duplikati
+- **Mape i aktivacija**: dodaj mapu (ili je povuci u prozor) i aktiviraj cijeli font, cijelu mapu ili samo pojedine stilove; po želji privremena aktivacija do zatvaranja aplikacije; trajna instalacija bez administratorskih prava
+- **Google Fonts**: pregledaj katalog i preuzmi fontove jednim klikom
+- **Postavke**: skrivanje sistemskih fontova, svijetla i tamna tema
 
 Postavke i tagovi spremaju se u `%APPDATA%\FontShelf\library.json`.
 
