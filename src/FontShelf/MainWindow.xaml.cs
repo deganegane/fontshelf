@@ -4,12 +4,18 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Interop;
 using FontShelf.Models;
 using FontShelf.Services;
 using FontShelf.ViewModels;
+using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
 
 namespace FontShelf
@@ -21,9 +27,22 @@ namespace FontShelf
 
         public MainWindow()
         {
+            _vm.ApplyInitialTheme();
             InitializeComponent();
             DataContext = _vm;
             _vm.RequestSelectAll += SelectAllEntry;
+            _vm.ThemeChanged += () =>
+            {
+                ApplyTitleBar();
+                _ = UpdateTesterAsync();
+            };
+            _vm.PropertyChanged += Vm_PropertyChanged;
+        }
+
+        private void Vm_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(MainViewModel.SelectedFont) || e.PropertyName == nameof(MainViewModel.ShowTester))
+                _ = UpdateTesterAsync();
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -33,7 +52,28 @@ namespace FontShelf
                 SelectAllEntry();
         }
 
-        private void Window_Closing(object sender, CancelEventArgs e) => _vm.SaveNow();
+        private void Window_Closing(object sender, CancelEventArgs e) => _vm.OnClosing();
+
+        #region Tamna naslovna traka
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+
+        private void Window_SourceInitialized(object sender, EventArgs e) => ApplyTitleBar();
+
+        private void ApplyTitleBar()
+        {
+            try
+            {
+                var h = new WindowInteropHelper(this).Handle;
+                if (h == IntPtr.Zero) return;
+                int dark = _vm.LightTheme ? 0 : 1;
+                DwmSetWindowAttribute(h, 20, ref dark, sizeof(int));
+            }
+            catch { }
+        }
+
+        #endregion
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
         {
@@ -61,10 +101,21 @@ namespace FontShelf
 
         private static T Ctx<T>(object sender) where T : class => (sender as FrameworkElement)?.DataContext as T;
 
-        private static void SafeCopy(string text)
+        private void SafeCopy(string text, string status)
         {
             if (string.IsNullOrEmpty(text)) return;
-            try { Clipboard.SetText(text); } catch { }
+            try
+            {
+                Clipboard.SetText(text);
+                _vm.StatusText = status;
+            }
+            catch { _vm.StatusText = "Međuspremnik je zauzet, pokušaj ponovno."; }
+        }
+
+        private string PickFolder(string title)
+        {
+            var dlg = new OpenFolderDialog { Title = title };
+            return dlg.ShowDialog(this) == true ? dlg.FolderName : null;
         }
 
         #region Bočna traka
@@ -119,6 +170,17 @@ namespace FontShelf
             if (r == MessageBoxResult.OK) _vm.DeleteTag(entry.Value);
         }
 
+        private async void ExportTag_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = Ctx<SidebarEntry>(sender);
+            if (entry == null) return;
+            e.Handled = true;
+            var fonts = _vm.FontsWithTag(entry.Value);
+            if (fonts.Count == 0) { _vm.StatusText = "Tag nema nijedan font."; return; }
+            var dir = PickFolder($"Izvoz fontova s tagom „{entry.Title}”");
+            if (dir != null) await _vm.ExportAsync(fonts, dir);
+        }
+
         private async void AddFolder_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new OpenFolderDialog { Title = "Odaberi mapu s fontovima", Multiselect = true };
@@ -165,7 +227,17 @@ namespace FontShelf
 
         #endregion
 
-        #region Kartice i usporedba
+        #region Glavni prikaz
+
+        private void Sort_Click(object sender, RoutedEventArgs e) => _vm.CycleSort();
+
+        private void GridHost_SizeChanged(object sender, SizeChangedEventArgs e) => _vm.SetGridWidth(e.NewSize.Width);
+
+        private void GridCell_Click(object sender, RoutedEventArgs e)
+        {
+            var f = Ctx<FontItem>(sender);
+            if (f != null) _vm.SelectedFont = f;
+        }
 
         private void CompareToggle_Click(object sender, RoutedEventArgs e)
         {
@@ -187,6 +259,39 @@ namespace FontShelf
 
         private void ClearCompare_Click(object sender, RoutedEventArgs e) => _vm.ClearCompare();
 
+        private void SwapCompare_Click(object sender, RoutedEventArgs e) => _vm.SwapCompare();
+
+        #endregion
+
+        #region Google Fonts
+
+        private async void RefreshGoogle_Click(object sender, RoutedEventArgs e) => await _vm.EnsureGoogleAsync(true);
+
+        private void GoogleCategory_Checked(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe) _vm.GoogleCategory = fe.Tag as string ?? "";
+        }
+
+        private async void DownloadGoogle_Click(object sender, RoutedEventArgs e)
+        {
+            var g = Ctx<GoogleFontEntry>(sender);
+            if (g != null) await _vm.DownloadGoogleAsync(g);
+        }
+
+        private void ShowGoogleFont_Click(object sender, RoutedEventArgs e)
+        {
+            var g = Ctx<GoogleFontEntry>(sender);
+            if (g == null) return;
+            var f = _vm.FindDownloadedGoogleFont(g);
+            if (f == null) { _vm.StatusText = "Font još nije učitan u biblioteku."; return; }
+            _vm.SearchText = "";
+            SelectAllEntry();
+            _vm.IsListMode = true;
+            _vm.Refresh();
+            _vm.SelectedFont = f;
+            Dispatcher.BeginInvoke(new Action(() => FontList.ScrollIntoView(f)));
+        }
+
         #endregion
 
         #region Detalji
@@ -204,6 +309,12 @@ namespace FontShelf
         private async void Activate_Click(object sender, RoutedEventArgs e)
             => await _vm.ToggleActivationAsync(_vm.SelectedFont);
 
+        private async void ToggleStyle_Click(object sender, RoutedEventArgs e)
+        {
+            var s = Ctx<FontStyleItem>(sender);
+            if (s != null) await _vm.ToggleStyleActivationAsync(_vm.SelectedFont, s);
+        }
+
         private async void Install_Click(object sender, RoutedEventArgs e)
         {
             var f = _vm.SelectedFont;
@@ -214,19 +325,25 @@ namespace FontShelf
             if (r == MessageBoxResult.OK) await _vm.InstallAsync(f);
         }
 
+        private async void ExportFont_Click(object sender, RoutedEventArgs e)
+        {
+            var f = _vm.SelectedFont;
+            if (f == null) return;
+            var dir = PickFolder($"Izvoz fonta „{f.Name}”");
+            if (dir != null) await _vm.ExportAsync(new[] { f }, dir);
+        }
+
         private void ShowInExplorer_Click(object sender, RoutedEventArgs e)
         {
-            var file = _vm.SelectedFont?.FirstFile;
-            if (file == null || !File.Exists(file)) return;
+            var f = _vm.SelectedFont;
+            if (f == null) return;
+            var file = f.FirstFile ?? f.MainFile ?? FontAnalyzer.AllFiles(f).FirstOrDefault();
+            if (file == null || !File.Exists(file)) { _vm.StatusText = "Datoteku fonta nije moguće pronaći."; return; }
             try { Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{file}\"") { UseShellExecute = true }); }
             catch { }
         }
 
-        private void CopyName_Click(object sender, RoutedEventArgs e)
-        {
-            SafeCopy(_vm.SelectedFont?.Name);
-            _vm.StatusText = "Naziv fonta kopiran.";
-        }
+        private void CopyName_Click(object sender, RoutedEventArgs e) => SafeCopy(_vm.SelectedFont?.Name, "Naziv fonta kopiran.");
 
         private void AddTagBox_KeyDown(object sender, KeyEventArgs e)
         {
@@ -246,22 +363,158 @@ namespace FontShelf
             if ((sender as FrameworkElement)?.Tag is string tag) _vm.AddTagToFont(_vm.SelectedFont, tag);
         }
 
+        #endregion
+
+        #region Glifovi
+
         private void Glyph_Click(object sender, RoutedEventArgs e)
         {
             var g = Ctx<GlyphItem>(sender);
             if (g != null) _vm.SelectedGlyph = g;
         }
 
-        private void CopyGlyph_Click(object sender, RoutedEventArgs e)
+        private void CopyGlyph_Click(object sender, RoutedEventArgs e) => SafeCopy(_vm.SelectedGlyph?.Text, "Znak kopiran.");
+
+        private void CopyGlyphCode_Click(object sender, RoutedEventArgs e) => SafeCopy(_vm.SelectedGlyph?.Code, "Kod znaka kopiran.");
+
+        private void CopyAllGlyphs_Click(object sender, RoutedEventArgs e)
         {
-            SafeCopy(_vm.SelectedGlyph?.Text);
-            _vm.StatusText = "Znak kopiran.";
+            if (_vm.SelectedFont == null) return;
+            var all = FontAnalyzer.AllCharacters(_vm.SelectedFont);
+            SafeCopy(all, $"Kopirano {all.Length} znakova.");
         }
 
-        private void CopyGlyphCode_Click(object sender, RoutedEventArgs e)
+        private string AskSavePath(string ext, string filter)
         {
-            SafeCopy(_vm.SelectedGlyph?.Code);
-            _vm.StatusText = "Kod znaka kopiran.";
+            var f = _vm.SelectedFont;
+            var g = _vm.SelectedGlyph;
+            if (f == null || g == null) return null;
+            var safe = new string(f.Name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c).ToArray());
+            var dlg = new SaveFileDialog
+            {
+                FileName = $"{safe}-U+{g.CodePoint:X4}.{ext}",
+                Filter = filter,
+                DefaultExt = ext
+            };
+            return dlg.ShowDialog(this) == true ? dlg.FileName : null;
+        }
+
+        private void SaveGlyphSvg_Click(object sender, RoutedEventArgs e)
+        {
+            var path = AskSavePath("svg", "SVG slika|*.svg");
+            if (path == null) return;
+            try
+            {
+                GlyphExporter.SaveSvg(_vm.SelectedFont, _vm.SelectedGlyph.CodePoint, path);
+                _vm.StatusText = "Znak spremljen kao SVG.";
+            }
+            catch (Exception ex) { _vm.StatusText = "Spremanje nije uspjelo: " + ex.Message; }
+        }
+
+        private void SaveGlyphPng_Click(object sender, RoutedEventArgs e)
+        {
+            var path = AskSavePath("png", "PNG slika|*.png");
+            if (path == null) return;
+            try
+            {
+                GlyphExporter.SavePng(_vm.SelectedFont, _vm.SelectedGlyph.CodePoint, path);
+                _vm.StatusText = "Znak spremljen kao PNG.";
+            }
+            catch (Exception ex) { _vm.StatusText = "Spremanje nije uspjelo: " + ex.Message; }
+        }
+
+        #endregion
+
+        #region Tester (WebView2)
+
+        private CoreWebView2Environment _env;
+        private Task _initTask;
+        private TesterPage.Prepared _tester;
+        private int _nav;
+
+        private async Task InitWebViewAsync()
+        {
+            Directory.CreateDirectory(AppPaths.Local);
+            _env = await CoreWebView2Environment.CreateAsync(null, Path.Combine(AppPaths.Local, "WebView2"));
+            await TesterView.EnsureCoreWebView2Async(_env);
+            TesterView.DefaultBackgroundColor = System.Drawing.Color.Transparent;
+            var core = TesterView.CoreWebView2;
+            core.Settings.AreDevToolsEnabled = false;
+            core.Settings.IsStatusBarEnabled = false;
+            core.Settings.AreBrowserAcceleratorKeysEnabled = false;
+            core.AddWebResourceRequestedFilter("https://fontshelf.local/*", CoreWebView2WebResourceContext.All);
+            core.WebResourceRequested += OnTesterRequest;
+        }
+
+        private Dictionary<string, string> TesterColors() => new Dictionary<string, string>
+        {
+            ["bg"] = ThemeManager.Css("PanelBrush"),
+            ["card"] = ThemeManager.Css("CardBrush"),
+            ["text"] = ThemeManager.Css("TextBrush"),
+            ["sub"] = ThemeManager.Css("SubTextBrush"),
+            ["line"] = ThemeManager.Css("LineBrush"),
+            ["accent"] = ThemeManager.Css("AccentBrush"),
+            ["input"] = ThemeManager.Css("InputBrush")
+        };
+
+        private async Task UpdateTesterAsync()
+        {
+            if (!_vm.ShowTester || _vm.SelectedFont == null) return;
+            try
+            {
+                _initTask ??= InitWebViewAsync();
+                await _initTask;
+
+                var font = _vm.SelectedFont;
+                var text = _vm.EffectivePreviewText;
+                var size = Math.Min(Math.Max(_vm.PreviewSize, 24), 96);
+                var colors = TesterColors();
+                var prepared = await Task.Run(() => TesterPage.Build(font, text, size, colors));
+                if (font != _vm.SelectedFont) return;
+
+                _tester = prepared;
+                TesterMessage.Visibility = Visibility.Collapsed;
+                TesterView.Visibility = Visibility.Visible;
+                TesterView.CoreWebView2.Navigate($"https://fontshelf.local/tester.html?n={++_nav}");
+            }
+            catch (Exception ex)
+            {
+                _initTask = null;
+                TesterView.Visibility = Visibility.Collapsed;
+                TesterMessage.Visibility = Visibility.Visible;
+                TesterMessage.Text = "Tester treba Microsoft Edge WebView2 Runtime (ugrađen je u Windows 10/11, a može se " +
+                                     "preuzeti s Microsoftove stranice).\n\n" + ex.Message;
+            }
+        }
+
+        private void OnTesterRequest(object sender, CoreWebView2WebResourceRequestedEventArgs e)
+        {
+            var t = _tester;
+            if (t == null || _env == null) return;
+            try
+            {
+                var path = new Uri(e.Request.Uri).AbsolutePath;
+                if (path == "/tester.html")
+                {
+                    e.Response = _env.CreateWebResourceResponse(new MemoryStream(Encoding.UTF8.GetBytes(t.Html)), 200, "OK",
+                        "Content-Type: text/html; charset=utf-8");
+                }
+                else if (path.StartsWith("/font/") && int.TryParse(path.Substring(6), out var i) && i >= 0 && i < t.Files.Count)
+                {
+                    var bytes = File.ReadAllBytes(t.Files[i]);
+                    var type = t.Files[i].EndsWith(".otf", StringComparison.OrdinalIgnoreCase) ? "font/otf" : "font/ttf";
+                    e.Response = _env.CreateWebResourceResponse(new MemoryStream(bytes), 200, "OK",
+                        $"Content-Type: {type}\r\nAccess-Control-Allow-Origin: *");
+                }
+                else
+                {
+                    e.Response = _env.CreateWebResourceResponse(null, 404, "Not Found", "");
+                }
+            }
+            catch
+            {
+                e.Response = _env.CreateWebResourceResponse(null, 404, "Not Found", "");
+            }
         }
 
         #endregion
