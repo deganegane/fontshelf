@@ -1039,8 +1039,19 @@ namespace FontShelf.ViewModels
             return SetFilesActivatedAsync(files, activate, fonts.Count == 1 ? $"„{fonts[0].Name}”" : Plural.Fonts(fonts.Count));
         }
 
-        public Task ToggleActivationAsync(FontItem f)
-            => f == null || f.IsSystem ? Task.CompletedTask : SetActivatedAsync(new[] { f }, !f.IsActivated);
+        public async Task ToggleActivationAsync(FontItem f)
+        {
+            if (f == null || f.IsSystem) return;
+            if (f.GoogleEntry != null)
+            {
+                var g = f.GoogleEntry;
+                await ToggleGoogleAsync(g);
+                var lib = FindDownloadedGoogleFont(g);
+                if (lib != null) SelectedFont = lib;
+                return;
+            }
+            await SetActivatedAsync(new[] { f }, !f.IsActivated);
+        }
 
         public Task ToggleStyleActivationAsync(FontItem f, FontStyleItem s)
             => s?.FilePath == null ? Task.CompletedTask
@@ -1413,7 +1424,12 @@ namespace FontShelf.ViewModels
         public async Task ToggleGoogleAsync(GoogleFontEntry e)
         {
             if (e == null || e.IsDownloading) return;
-            var font = FindDownloadedGoogleFont(e);
+            var font = FindGoogleLibraryFont(e);
+            if (font == null && _all.Any(f => f.IsSystem && string.Equals(f.Name, e.Family, StringComparison.CurrentCultureIgnoreCase)))
+            {
+                StatusText = $"„{e.Family}” je već instaliran u sustavu — ne treba ga aktivirati.";
+                return;
+            }
             if (font != null && font.IsActivated)
             {
                 await SetActivatedAsync(new[] { font }, false);
@@ -1429,7 +1445,7 @@ namespace FontShelf.ViewModels
                     if (!GoogleFontsService.IsDownloaded(e.Family)) await GoogleFontsService.DownloadAsync(e);
                     e.IsDownloaded = true;
                     await ReloadFolderAsync(GoogleFontsService.Dir);
-                    font = FindDownloadedGoogleFont(e);
+                    font = FindGoogleLibraryFont(e);
                 }
                 if (font != null)
                 {
@@ -1442,6 +1458,53 @@ namespace FontShelf.ViewModels
                 StatusText = $"„{e.Family}” nije moguće aktivirati: {ex.Message}";
             }
             e.IsDownloading = false;
+        }
+
+        private GoogleFontEntry _selectedGoogle;
+        public GoogleFontEntry SelectedGoogle
+        {
+            get => _selectedGoogle;
+            set
+            {
+                if (Set(ref _selectedGoogle, value) && value != null) _ = ShowGoogleInInspectorAsync(value);
+            }
+        }
+
+        /// <summary>Učita cijeli Google font (bez dodavanja u biblioteku) i prikaže ga u desnom panelu.</summary>
+        private async Task ShowGoogleInInspectorAsync(GoogleFontEntry e)
+        {
+            var lib = FindDownloadedGoogleFont(e);
+            if (lib != null) { SelectedFont = lib; return; }
+
+            IsBusy = true;
+            StatusText = $"Učitavam „{e.Family}”…";
+            try
+            {
+                var dir = GoogleFontsService.FullPreviewDir(e.Family);
+                if (!Directory.Exists(dir) || !Directory.EnumerateFiles(dir).Any(FontLoader.IsFontFile))
+                    await GoogleFontsService.DownloadAsync(e, dir);
+                var items = await Task.Run(() => FontLoader.LoadFolder(dir));
+                var item = items.FirstOrDefault(i => string.Equals(i.Name, e.Family, StringComparison.OrdinalIgnoreCase))
+                           ?? items.FirstOrDefault();
+                if (item != null && SelectedGoogle == e)
+                {
+                    item.GoogleEntry = e;
+                    var r = await Task.Run(() => FontAnalyzer.Analyze(item));
+                    item.Version = r.Version;
+                    item.Designer = r.Designer;
+                    item.Manufacturer = r.Manufacturer;
+                    item.IsVariable = r.IsVariable || e.IsVariableFont;
+                    item.IsMono = r.Mono;
+                    item.HasCroatian = r.Croatian;
+                    SelectedFont = item;
+                }
+                StatusText = $"„{e.Family}” — klikni Aktiviraj da ga koristiš u drugim programima.";
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"„{e.Family}” nije moguće učitati: {ex.Message}";
+            }
+            IsBusy = false;
         }
 
         private void SyncGoogleActiveState()
@@ -1477,9 +1540,15 @@ namespace FontShelf.ViewModels
 
         public FontItem FindDownloadedGoogleFont(GoogleFontEntry e)
         {
-            var dir = GoogleFontsService.FamilyDir(e.Family);
-            return _all.FirstOrDefault(f => f.FirstFile != null && f.FirstFile.StartsWith(dir, StringComparison.OrdinalIgnoreCase))
+            return FindGoogleLibraryFont(e)
                    ?? _all.FirstOrDefault(f => string.Equals(f.Name, e.Family, StringComparison.CurrentCultureIgnoreCase));
+        }
+
+        /// <summary>Samo font iz mape Google Fonts (ne istoimeni sistemski).</summary>
+        private FontItem FindGoogleLibraryFont(GoogleFontEntry e)
+        {
+            var dir = GoogleFontsService.FamilyDir(e.Family) + "\\";
+            return _all.FirstOrDefault(f => f.FirstFile != null && f.FirstFile.StartsWith(dir, StringComparison.OrdinalIgnoreCase));
         }
 
         #endregion

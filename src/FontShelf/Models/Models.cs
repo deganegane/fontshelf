@@ -166,6 +166,9 @@ namespace FontShelf.Models
         /// <summary>Kategorija iz Google Fonts kataloga (ako je font tamo).</summary>
         public string Category { get; set; }
 
+        /// <summary>Ako je ovo privremeni pregled Google fonta (nije u biblioteci).</summary>
+        public GoogleFontEntry GoogleEntry { get; set; }
+
         /// <summary>Glavna datoteka (za instalirane fontove, otkrivena analizom).</summary>
         public string MainFile { get; set; }
     }

@@ -843,14 +843,39 @@ namespace FontShelf.Services
         private static readonly Regex UrlRx = new Regex(@"url\((?<u>[^)]+)\)", RegexOptions.Compiled);
 
         /// <summary>Preuzima sve stilove obitelji kao TTF i vraća mapu u koju su spremljeni.</summary>
-        public static async Task<int> DownloadAsync(GoogleFontEntry e)
+        /// <summary>Mapa s punim fontom za pregled (izvan biblioteke).</summary>
+        public static string FullPreviewDir(string family)
         {
+            var safe = new string(family.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c).ToArray());
+            return Path.Combine(PreviewDir, safe, "full");
+        }
+
+        public static async Task<int> DownloadAsync(GoogleFontEntry e, string targetDir = null)
+        {
+            var dir = targetDir ?? FamilyDir(e.Family);
+
+            // Ako je font već preuzet za pregled, samo ga kopiraj
+            var pre = FullPreviewDir(e.Family);
+            if (targetDir == null && Directory.Exists(pre))
+            {
+                var files = Directory.EnumerateFiles(pre).Where(FontLoader.IsFontFile).ToList();
+                if (files.Count > 0)
+                {
+                    Directory.CreateDirectory(dir);
+                    foreach (var f in files)
+                    {
+                        var dest = Path.Combine(dir, Path.GetFileName(f));
+                        if (!File.Exists(dest)) File.Copy(f, dest);
+                    }
+                    return files.Count;
+                }
+            }
+
             var variants = e.Variants.Select(v => v.EndsWith("i") ? v.TrimEnd('i') + "italic" : v);
             var url = "https://fonts.googleapis.com/css?family=" + Uri.EscapeDataString(e.Family).Replace("%20", "+")
                       + ":" + string.Join(",", variants);
             var css = await Http.GetStringAsync(url);
 
-            var dir = FamilyDir(e.Family);
             Directory.CreateDirectory(dir);
             int n = 0;
             var done = new HashSet<string>();

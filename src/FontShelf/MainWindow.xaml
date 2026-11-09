@@ -1002,7 +1002,7 @@
                         </DockPanel>
                         <TextBlock Grid.Row="1" Text="{Binding GoogleStatus}" Foreground="{DynamicResource SubTextBrush}" Margin="20,0,24,10"
                                    TextWrapping="Wrap"/>
-                        <ListBox Grid.Row="2" Style="{StaticResource PlainList}" ItemsSource="{Binding GoogleView}"
+                        <ListBox Grid.Row="2" Style="{StaticResource PlainList}" ItemsSource="{Binding GoogleView}" SelectedItem="{Binding SelectedGoogle}"
                                  ItemContainerStyle="{StaticResource FontRowItem}"
                                  VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                                  VirtualizingPanel.ScrollUnit="Pixel" ScrollViewer.CanContentScroll="True">
