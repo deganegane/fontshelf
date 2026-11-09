@@ -158,18 +158,94 @@ namespace FontShelf.Services
             catch { return new List<FontFamily>(); }
         }
 
+        // ---- Keš stilova instaliranih fontova (čitanje stilova je najsporiji dio pokretanja) ----
+        public class StyleInfo
+        {
+            public string N { get; set; }
+            public int W { get; set; }
+            public int I { get; set; }
+            public int S { get; set; }
+        }
+
+        public class SystemCache
+        {
+            public Dictionary<string, List<StyleInfo>> Families { get; set; } = new Dictionary<string, List<StyleInfo>>();
+            /// <summary>Datoteka korisničkog fonta (putanja|vrijeme) → imena obitelji u njoj.</summary>
+            public Dictionary<string, List<string>> UserFiles { get; set; } = new Dictionary<string, List<string>>();
+        }
+
+        private static string SystemCachePath => Path.Combine(AppPaths.Local, "system-fonts-cache-v1.json");
+
+        private static SystemCache LoadSystemCache()
+        {
+            try
+            {
+                if (File.Exists(SystemCachePath))
+                    return JsonSerializer.Deserialize<SystemCache>(File.ReadAllText(SystemCachePath)) ?? new SystemCache();
+            }
+            catch { }
+            return new SystemCache();
+        }
+
+        private static void SaveSystemCache(SystemCache c)
+        {
+            try
+            {
+                Directory.CreateDirectory(AppPaths.Local);
+                var tmp = SystemCachePath + ".tmp";
+                File.WriteAllText(tmp, JsonSerializer.Serialize(c));
+                File.Move(tmp, SystemCachePath, true);
+            }
+            catch { }
+        }
+
+        private static FontItem FromCache(FontFamily fam, string name, List<StyleInfo> info)
+        {
+            var styles = info.Select(i => new FontStyleItem
+            {
+                Name = i.N,
+                Family = fam,
+                Weight = FontWeight.FromOpenTypeWeight(Math.Max(1, Math.Min(999, i.W))),
+                Style = i.I == 1 ? FontStyles.Italic : i.I == 2 ? FontStyles.Oblique : FontStyles.Normal,
+                Stretch = FontStretch.FromOpenTypeStretch(Math.Max(1, Math.Min(9, i.S)))
+            }).ToList();
+            if (styles.Count == 0) return null;
+            return new FontItem { Key = "sys:" + name, Name = name, Family = fam, Styles = styles };
+        }
+
+        private static List<StyleInfo> ToCache(FontItem item) => item.Styles.Select(s => new StyleInfo
+        {
+            N = s.Name,
+            W = s.Weight.ToOpenTypeWeight(),
+            I = s.Style == FontStyles.Italic ? 1 : s.Style == FontStyles.Oblique ? 2 : 0,
+            S = s.Stretch.ToOpenTypeStretch()
+        }).ToList();
+
         public static List<FontItem> LoadSystem()
         {
             var list = new List<FontItem>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var cache = LoadSystemCache();
+            var fresh = new SystemCache();
+            bool changed = false;
 
             foreach (var fam in Fonts.SystemFontFamilies)
             {
                 var name = GetName(fam);
                 if (string.IsNullOrWhiteSpace(name) || !seen.Add(name)) continue;
-                var item = Create(fam, name, null, null, "sys:" + name);
-                if (item != null) list.Add(item);
+                FontItem item;
+                if (cache.Families.TryGetValue(name, out var info) && info.Count > 0)
+                    item = FromCache(fam, name, info);
+                else
+                {
+                    item = Create(fam, name, null, null, "sys:" + name);
+                    changed = true;
+                }
+                if (item == null) continue;
+                fresh.Families[name] = cache.Families.TryGetValue(name, out var keep) && keep.Count > 0 ? keep : ToCache(item);
+                list.Add(item);
             }
+            if (cache.Families.Keys.Any(k => !fresh.Families.ContainsKey(k))) changed = true;
 
             // Fontovi instalirani samo za korisnika (Windows 10 1809+)
             try
@@ -178,18 +254,34 @@ namespace FontShelf.Services
                 {
                     foreach (var file in Directory.EnumerateFiles(UserFontsDir).Where(IsFontFile))
                     {
+                        string stamp;
+                        try { stamp = file + "|" + File.GetLastWriteTimeUtc(file).Ticks; } catch { continue; }
+
+                        // Ako znamo imena u datoteci i sva su već učitana, ne otvaramo je
+                        if (cache.UserFiles.TryGetValue(stamp, out var names) && names.All(seen.Contains))
+                        {
+                            fresh.UserFiles[stamp] = names;
+                            continue;
+                        }
+
+                        var found = new List<string>();
                         foreach (var fam in SafeFamilies(file))
                         {
                             var name = GetName(fam);
-                            if (string.IsNullOrWhiteSpace(name) || !seen.Add(name)) continue;
+                            if (string.IsNullOrWhiteSpace(name)) continue;
+                            found.Add(name);
+                            if (!seen.Add(name)) continue;
                             var item = Create(fam, name, null, null, "sys:" + name);
                             if (item != null) { item.MainFile = file; list.Add(item); }
                         }
+                        fresh.UserFiles[stamp] = found;
+                        changed = true;
                     }
                 }
             }
             catch { }
 
+            if (changed) SaveSystemCache(fresh);
             return list;
         }
 

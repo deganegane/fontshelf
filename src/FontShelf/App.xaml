@@ -187,15 +187,14 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}"
                                 BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="8">
                             <Grid>
                                 <TextBlock x:Name="Ph" Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
-                                           Foreground="{DynamicResource SubTextBrush}" Margin="{TemplateBinding Padding}"
-                                           Padding="5,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
+                                           Foreground="{DynamicResource SubTextBrush}"
+                                           Padding="2,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
                                            Visibility="Collapsed" TextTrimming="CharacterEllipsis"/>
-                                <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
-                                              VerticalAlignment="Center" Focusable="False"/>
+                                <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Focusable="False"/>
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -204,6 +203,7 @@
                             </Trigger>
                             <Trigger Property="IsKeyboardFocusWithin" Value="True">
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="Ph" Property="Visibility" Value="Collapsed"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -214,21 +214,25 @@
         <!-- Polje bez okvira (unutar vlastitog kontejnera) -->
         <Style x:Key="BareTextBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Padding" Value="4,7"/>
+            <Setter Property="Padding" Value="4,0"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
-                        <Grid Background="Transparent">
+                        <Grid Background="Transparent" Cursor="IBeam">
                             <TextBlock x:Name="Ph" Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
                                        Foreground="{DynamicResource SubTextBrush}" Margin="{TemplateBinding Padding}"
-                                       Padding="5,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
+                                       Padding="2,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
                                        Visibility="Collapsed" TextTrimming="CharacterEllipsis"/>
                             <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
-                                          VerticalAlignment="Center" Focusable="False"/>
+                                          VerticalAlignment="Center" Focusable="False" ClipToBounds="False"/>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="Text" Value="">
                                 <Setter TargetName="Ph" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="Ph" Property="Visibility" Value="Collapsed"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
