@@ -386,6 +386,15 @@ namespace FontShelf
 
         private void Sort_Click(object sender, RoutedEventArgs e) => _vm.CycleSort();
 
+        private void ResetFilters_Click(object sender, RoutedEventArgs e) => _vm.ResetFilters();
+
+        private void ResetRange_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag is string t) _vm.ResetRange(t);
+        }
+
+        private void Chip_Click(object sender, RoutedEventArgs e) => _vm.ChipsChanged();
+
         private void GridHost_SizeChanged(object sender, SizeChangedEventArgs e) => _vm.SetGridWidth(e.NewSize.Width);
 
         private void GridCell_Click(object sender, RoutedEventArgs e)
@@ -436,7 +445,7 @@ namespace FontShelf
         private async void DownloadGoogle_Click(object sender, RoutedEventArgs e)
         {
             var g = Ctx<GoogleFontEntry>(sender);
-            if (g != null) await _vm.DownloadGoogleAsync(g);
+            if (g != null) await _vm.ToggleGoogleAsync(g);
         }
 
         private void GoogleRow_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)

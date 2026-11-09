@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:conv="clr-namespace:FontShelf.Converters"
+        xmlns:ctl="clr-namespace:FontShelf.Controls"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="FontShelf" Height="900" Width="1500" MinWidth="1100" MinHeight="660"
@@ -396,12 +397,165 @@
                 BorderThickness="1,1,0,0" CornerRadius="10,0,0,0">
             <Grid>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="410"/>
                 </Grid.ColumnDefinitions>
 
+                <!-- ============ NAPREDNI FILTERI (FontBase stil) ============ -->
+                <Border Width="286" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0"
+                        Visibility="{Binding FilterPanelVisible, Converter={StaticResource BoolVis}}">
+                    <DockPanel>
+                        <DockPanel DockPanel.Dock="Top" Margin="24,24,16,8">
+                            <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Content="Poništi" Padding="9,5"
+                                    Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Top" Click="ResetFilters_Click"
+                                    Visibility="{Binding HasActiveFilters, Converter={StaticResource BoolVis}}"/>
+                            <StackPanel>
+                                <TextBlock Text="Filteri" FontFamily="{StaticResource DisplayFont}" FontSize="20" FontWeight="SemiBold"/>
+                                <TextBlock Foreground="{DynamicResource SubTextBrush}" FontSize="12" Margin="0,2,0,0">
+                                    <Run Text="Pronađeno: "/><Run Text="{Binding VisibleCount, Mode=OneWay}" FontWeight="SemiBold"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </DockPanel>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="24,4,18,28">
+                                <CheckBox Style="{StaticResource Switch}" Content="Samo duplikati" IsChecked="{Binding DuplicatesOnly}"/>
+
+                                <TextBlock Text="Oblik" Style="{StaticResource DetailTitle}" Margin="0,18,0,8"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="66"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Text="Kontrast" Foreground="{DynamicResource SubTextBrush}" FontSize="12" VerticalAlignment="Center"/>
+                                    <ToggleButton Grid.Column="1" Style="{StaticResource ShapeCell}" IsChecked="{Binding Cells[c0]}" ToolTip="Nizak kontrast (monoline)">
+                                        <TextBlock Text="O" FontFamily="Segoe UI" FontSize="26"/>
+                                    </ToggleButton>
+                                    <ToggleButton Grid.Column="2" Style="{StaticResource ShapeCell}" IsChecked="{Binding Cells[c1]}" ToolTip="Srednji kontrast">
+                                        <TextBlock Text="O" FontFamily="Georgia" FontSize="26"/>
+                                    </ToggleButton>
+                                    <ToggleButton Grid.Column="3" Style="{StaticResource ShapeCell}" IsChecked="{Binding Cells[c2]}" ToolTip="Visok kontrast">
+                                        <TextBlock Text="O" FontFamily="Bodoni MT, Times New Roman" FontWeight="Bold" FontSize="26"/>
+                                    </ToggleButton>
+
+                                    <TextBlock Grid.Row="1" Text="Debljina" Foreground="{DynamicResource SubTextBrush}" FontSize="12" VerticalAlignment="Center"/>
+                                    <ToggleButton Grid.Row="1" Grid.Column="1" Style="{StaticResource ShapeCell}" IsChecked="{Binding Cells[w0]}" ToolTip="Tanki">
+                                        <TextBlock Text="G" FontFamily="Segoe UI" FontWeight="Light" FontSize="26"/>
+                                    </ToggleButton>
+                                    <ToggleButton Grid.Row="1" Grid.Column="2" Style="{StaticResource ShapeCell}" IsChecked="{Binding Cells[w1]}" ToolTip="Normalni">
+                                        <TextBlock Text="G" FontFamily="Segoe UI" FontSize="26"/>
+                                    </ToggleButton>
+                                    <ToggleButton Grid.Row="1" Grid.Column="3" Style="{StaticResource ShapeCell}" IsChecked="{Binding Cells[w2]}" ToolTip="Debeli">
+                                        <TextBlock Text="G" FontFamily="Segoe UI" FontWeight="Black" FontSize="26"/>
+                                    </ToggleButton>
+
+                                    <TextBlock Grid.Row="2" Text="Širina" Foreground="{DynamicResource SubTextBrush}" FontSize="12" VerticalAlignment="Center"/>
+                                    <ToggleButton Grid.Row="2" Grid.Column="1" Style="{StaticResource ShapeCell}" IsChecked="{Binding Cells[p0]}" ToolTip="Uski (condensed)">
+                                        <TextBlock Text="A" FontFamily="Segoe UI" FontSize="26">
+                                            <TextBlock.LayoutTransform><ScaleTransform ScaleX="0.62"/></TextBlock.LayoutTransform>
+                                        </TextBlock>
+                                    </ToggleButton>
+                                    <ToggleButton Grid.Row="2" Grid.Column="2" Style="{StaticResource ShapeCell}" IsChecked="{Binding Cells[p1]}" ToolTip="Normalni">
+                                        <TextBlock Text="A" FontFamily="Segoe UI" FontSize="26"/>
+                                    </ToggleButton>
+                                    <ToggleButton Grid.Row="2" Grid.Column="3" Style="{StaticResource ShapeCell}" IsChecked="{Binding Cells[p2]}" ToolTip="Široki (extended)">
+                                        <TextBlock Text="A" FontFamily="Segoe UI" FontSize="26">
+                                            <TextBlock.LayoutTransform><ScaleTransform ScaleX="1.45"/></TextBlock.LayoutTransform>
+                                        </TextBlock>
+                                    </ToggleButton>
+
+                                    <TextBlock Grid.Row="3" Text="Serifi" Foreground="{DynamicResource SubTextBrush}" FontSize="12" VerticalAlignment="Center"/>
+                                    <ToggleButton Grid.Row="3" Grid.Column="1" Style="{StaticResource ShapeCell}" IsChecked="{Binding Cells[s0]}" ToolTip="Bez serifa (sans)">
+                                        <TextBlock Text="h" FontFamily="Segoe UI" FontSize="26"/>
+                                    </ToggleButton>
+                                    <ToggleButton Grid.Row="3" Grid.Column="2" Style="{StaticResource ShapeCell}" IsChecked="{Binding Cells[s1]}" ToolTip="Serifni">
+                                        <TextBlock Text="h" FontFamily="Georgia" FontSize="26"/>
+                                    </ToggleButton>
+                                    <ToggleButton Grid.Row="3" Grid.Column="3" Style="{StaticResource ShapeCell}" IsChecked="{Binding Cells[s2]}" ToolTip="Slab serif">
+                                        <TextBlock Text="h" FontFamily="Rockwell, Courier New" FontWeight="Bold" FontSize="26"/>
+                                    </ToggleButton>
+                                </Grid>
+
+                                <TextBlock Text="Oznake" Style="{StaticResource DetailTitle}" Margin="0,20,0,10"/>
+                                <ItemsControl ItemsSource="{Binding FilterChips}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <ToggleButton Style="{StaticResource ChipToggle}" IsChecked="{Binding IsSelected}" Click="Chip_Click">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Ellipse Width="7" Height="7" Margin="0,0,6,0" VerticalAlignment="Center"
+                                                             Fill="{Binding Name, Converter={StaticResource TagBrush}}"
+                                                             Visibility="{Binding IsUserTag, Converter={StaticResource BoolVis}}"/>
+                                                    <TextBlock Text="{Binding Name}"/>
+                                                </StackPanel>
+                                            </ToggleButton>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <TextBlock Text="Mjerenja" Style="{StaticResource DetailTitle}" Margin="0,20,0,4"/>
+                                <TextBlock Text="Povuci rubove za raspon, dvoklik vraća sve." FontSize="11.5"
+                                           Foreground="{DynamicResource SubTextBrush}" Margin="0,0,0,6"/>
+
+                                <ctl:RangeHistogram Margin="0,8,0,0" Values="{Binding ContrastHist}" Lower="{Binding ContrastMin}" Upper="{Binding ContrastMax}"
+                                                    Accent="{DynamicResource AccentBrush}" Muted="{DynamicResource SubTextBrush}"/>
+                                <DockPanel Margin="0,4,0,10">
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE7A7;" Padding="5" Tag="c"
+                                            ToolTip="Vrati" Click="ResetRange_Click"/>
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding ContrastRange}" Foreground="{DynamicResource SubTextBrush}"
+                                               FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                    <TextBlock Text="Kontrast" VerticalAlignment="Center"/>
+                                </DockPanel>
+
+                                <ctl:RangeHistogram Margin="0,8,0,0" Values="{Binding WeightHist}" Lower="{Binding WeightMin}" Upper="{Binding WeightMax}"
+                                                    Accent="{DynamicResource AccentBrush}" Muted="{DynamicResource SubTextBrush}"/>
+                                <DockPanel Margin="0,4,0,10">
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE7A7;" Padding="5" Tag="w"
+                                            ToolTip="Vrati" Click="ResetRange_Click"/>
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding WeightRange}" Foreground="{DynamicResource SubTextBrush}"
+                                               FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                    <TextBlock Text="Debljina" VerticalAlignment="Center"/>
+                                </DockPanel>
+
+                                <ctl:RangeHistogram Margin="0,8,0,0" Values="{Binding WidthHist}" Lower="{Binding WidthMin}" Upper="{Binding WidthMax}"
+                                                    Accent="{DynamicResource AccentBrush}" Muted="{DynamicResource SubTextBrush}"/>
+                                <DockPanel Margin="0,4,0,10">
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE7A7;" Padding="5" Tag="p"
+                                            ToolTip="Vrati" Click="ResetRange_Click"/>
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding WidthRange}" Foreground="{DynamicResource SubTextBrush}"
+                                               FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                    <TextBlock Text="Širina (proporcija)" VerticalAlignment="Center"/>
+                                </DockPanel>
+
+                                <ctl:RangeHistogram Margin="0,8,0,0" Values="{Binding XHeightHist}" Lower="{Binding XHeightMin}" Upper="{Binding XHeightMax}"
+                                                    Accent="{DynamicResource AccentBrush}" Muted="{DynamicResource SubTextBrush}"/>
+                                <DockPanel Margin="0,4,0,10">
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE7A7;" Padding="5" Tag="x"
+                                            ToolTip="Vrati" Click="ResetRange_Click"/>
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding XHeightRange}" Foreground="{DynamicResource SubTextBrush}"
+                                               FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                    <TextBlock Text="Visina malih slova" VerticalAlignment="Center"/>
+                                </DockPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+                </Border>
+
                 <!-- ============ GLAVNI DIO ============ -->
-                <Grid Margin="0,0,0,0">
+                <Grid Grid.Column="1">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -434,6 +588,15 @@
                                 </RadioButton>
                             </StackPanel>
                         </Border>
+                        <ToggleButton DockPanel.Dock="Right" Style="{StaticResource PillToggle}" Margin="0,0,10,0" VerticalAlignment="Center"
+                                      IsChecked="{Binding ShowFilters}" ToolTip="Napredni filteri (kontrast, debljina, širina, serifi…)"
+                                      Visibility="{Binding IsLibraryMode, Converter={StaticResource BoolVis}}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE71C;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center"
+                                           Margin="0,0,7,0"/>
+                                <TextBlock Text="{Binding FiltersButtonText}"/>
+                            </StackPanel>
+                        </ToggleButton>
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Text="{Binding HeaderTitle}" FontFamily="{StaticResource DisplayFont}" FontSize="28"
                                        FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
@@ -882,7 +1045,7 @@
                 </Grid>
 
                 <!-- ============ INSPEKTOR ============ -->
-                <Border Grid.Column="1" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1,0,0,0">
+                <Border Grid.Column="2" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1,0,0,0">
                     <Grid>
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="30"
                                     Visibility="{Binding SelectedFont, Converter={StaticResource NullVisInv}}">
@@ -1129,7 +1292,7 @@
                 </Border>
 
                 <!-- Obavijest (toast) -->
-                <Border x:Name="Toast" Grid.ColumnSpan="2" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,24"
+                <Border x:Name="Toast" Grid.ColumnSpan="3" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,24"
                         Background="{DynamicResource ToastBrush}" CornerRadius="18" Padding="16,9,18,10" Opacity="0"
                         IsHitTestVisible="False" Effect="{StaticResource PopupShadow}" MaxWidth="640">
                     <StackPanel Orientation="Horizontal">

@@ -274,6 +274,11 @@ namespace FontShelf.Services
         public string Manufacturer = "";
         public string MainFile;
         public bool IsVariable;
+        public double Contrast = double.NaN;
+        public double Weight = double.NaN;
+        public double Width = double.NaN;
+        public double XHeight = double.NaN;
+        public int Serif = -1;
     }
 
     public static class FontAnalyzer
@@ -360,9 +365,76 @@ namespace FontShelf.Services
                 res.Manufacturer = Pick(g.ManufacturerNames);
                 res.MainFile = f.MainFile ?? RealCase(FileOf(g));
                 if (res.MainFile != null) res.IsVariable = OpenTypeReader.HasVariations(res.MainFile);
+                try { Measure(g, res); } catch { }
             }
             catch { }
             return res;
+        }
+
+        /// <summary>Duljina prvog "punog" dijela na liniji od a do b (uzorkovanjem oblika).</summary>
+        private static double FirstRun(Geometry geo, Point a, Point b, int n = 140)
+        {
+            var d = b - a;
+            double len = d.Length;
+            bool inside = false;
+            double start = 0;
+            for (int i = 0; i < n; i++)
+            {
+                double t = (double)i / (n - 1);
+                bool c = geo.FillContains(a + d * t);
+                if (c && !inside) { inside = true; start = t; }
+                else if (!c && inside) return (t - start) * len;
+            }
+            return inside ? (1 - start) * len : 0;
+        }
+
+        /// <summary>Mjeri kontrast, debljinu, širinu, x-visinu i serife (za napredne filtere).</summary>
+        private static void Measure(GlyphTypeface g, AnalysisResult res)
+        {
+            var map = g.CharacterToGlyphMap;
+            var adv = g.AdvanceWidths;
+
+            if (map.TryGetValue('o', out var go))
+            {
+                var geo = g.GetGlyphOutline(go, 100, 100);
+                var b = geo.Bounds;
+                if (!b.IsEmpty && b.Width > 1 && b.Height > 1)
+                {
+                    double ym = b.Top + b.Height / 2, xm = b.Left + b.Width / 2;
+                    double side = FirstRun(geo, new Point(b.Left - 1, ym), new Point(xm, ym));
+                    double top = FirstRun(geo, new Point(xm, b.Top - 1), new Point(xm, ym));
+                    if (side > 0 && top > 0)
+                    {
+                        double thick = Math.Max(side, top), thin = Math.Min(side, top);
+                        res.Contrast = 1 - thin / thick;
+                        res.Weight = thick / b.Height;
+                    }
+                }
+            }
+
+            if (g.XHeight > 0 && map.TryGetValue('n', out var gn) && map.TryGetValue('o', out var go2))
+                res.Width = (adv[gn] + adv[go2]) / 2 / g.XHeight;
+
+            if (g.CapsHeight > 0 && g.XHeight > 0)
+                res.XHeight = g.XHeight / g.CapsHeight;
+
+            if (map.TryGetValue('I', out var gI))
+            {
+                var geo = g.GetGlyphOutline(gI, 100, 100);
+                var b = geo.Bounds;
+                if (!b.IsEmpty && b.Height > 1)
+                {
+                    double Span(double y) => FirstRun(geo, new Point(b.Left - 1, y), new Point(b.Right + 1, y), 120);
+                    double mid = Span(b.Top + b.Height * 0.5);
+                    double bottom = Span(b.Bottom - b.Height * 0.04);
+                    double topW = Span(b.Top + b.Height * 0.04);
+                    if (mid > 0)
+                    {
+                        bool serif = bottom / mid > 1.7 && topW / mid > 1.7;
+                        res.Serif = !serif ? 0 : (!double.IsNaN(res.Contrast) && res.Contrast < 0.35 ? 2 : 1);
+                    }
+                }
+            }
         }
 
         /// <summary>Sve datoteke fonta (i za instalirane fontove).</summary>

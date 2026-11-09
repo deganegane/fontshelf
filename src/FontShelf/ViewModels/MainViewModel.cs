@@ -236,7 +236,7 @@ namespace FontShelf.ViewModels
         {
             foreach (var p in new[] { nameof(View), nameof(IsListMode), nameof(IsGridMode), nameof(IsTableMode), nameof(IsCompareMode),
                          nameof(ShowList), nameof(ShowGrid), nameof(ShowTable), nameof(ShowCompare), nameof(IsGoogleMode),
-                         nameof(IsLibraryMode), nameof(CountText) })
+                         nameof(IsLibraryMode), nameof(CountText), nameof(FilterPanelVisible) })
                 OnPropertyChanged(p);
         }
 
@@ -247,6 +247,7 @@ namespace FontShelf.ViewModels
 
         public bool IsGoogleMode => SelectedEntry?.Kind == SidebarKind.Google;
         public bool IsLibraryMode => !IsGoogleMode;
+        public bool FilterPanelVisible => ShowFilters && !IsGoogleMode;
         public bool ShowList => !IsGoogleMode && View == ViewMode.List;
         public bool ShowGrid => !IsGoogleMode && View == ViewMode.Grid;
         public bool ShowTable => !IsGoogleMode && View == ViewMode.Table;
@@ -546,6 +547,7 @@ namespace FontShelf.ViewModels
             IsBusy = false;
             StatusText = $"{Plural.Fonts(_all.Count)} u biblioteci";
             ScheduleSave();
+            _ = EnsureGoogleAsync();
         }
 
         private void AddUnique(IEnumerable<FontItem> items)
@@ -611,7 +613,14 @@ namespace FontShelf.ViewModels
                 f.Manufacturer = r.Manufacturer;
                 f.IsVariable = r.IsVariable;
                 if (f.MainFile == null) f.MainFile = r.MainFile;
+                f.ContrastRaw = r.Contrast;
+                f.WeightRaw = r.Weight;
+                f.WidthRaw = r.Width;
+                f.XHeightRaw = r.XHeight;
+                f.SerifClass = r.Serif;
             }
+            RecomputeMetrics();
+            RebuildChips();
             UpdateCounts();
             if (SelectedEntry != null && (SelectedEntry.Kind == SidebarKind.Mono || SelectedEntry.Kind == SidebarKind.Croatian
                                           || SelectedEntry.Kind == SidebarKind.Variable))
@@ -656,6 +665,8 @@ namespace FontShelf.ViewModels
                              || (f.Designer ?? "").IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0;
                 if (!match) return false;
             }
+
+            if (!PassesAdvanced(f)) return false;
 
             if (e == null) return true;
             switch (e.Kind)
@@ -834,6 +845,7 @@ namespace FontShelf.ViewModels
 
         private void SyncTagEntries()
         {
+            RebuildChips();
             var names = AllTagNames.ToList();
             foreach (var e in TagEntries.Where(e => !names.Contains(e.Value)).ToList()) TagEntries.Remove(e);
             for (int i = 0; i < names.Count; i++)
@@ -983,6 +995,7 @@ namespace FontShelf.ViewModels
             }
 
             UpdateActivationState();
+            SyncGoogleActiveState();
             UpdateCounts();
             if (SelectedEntry?.Kind == SidebarKind.Activated) Refresh();
             IsBusy = false;
@@ -1053,6 +1066,258 @@ namespace FontShelf.ViewModels
 
         #endregion
 
+
+        #region Napredni filteri
+
+        public class CellSet : ObservableObject
+        {
+            private readonly HashSet<string> _on = new HashSet<string>();
+            public event Action Changed;
+
+            public bool this[string key]
+            {
+                get => _on.Contains(key);
+                set
+                {
+                    if (value ? _on.Add(key) : _on.Remove(key))
+                    {
+                        OnPropertyChanged("Item[]");
+                        Changed?.Invoke();
+                    }
+                }
+            }
+
+            public bool Any(char row) => _on.Any(k => k[0] == row);
+            public bool Has(char row, int cls) => _on.Contains(row.ToString() + cls);
+            public int Count => _on.Count;
+
+            public void Clear()
+            {
+                _on.Clear();
+                OnPropertyChanged("Item[]");
+                Changed?.Invoke();
+            }
+        }
+
+        private CellSet _cells;
+        public CellSet Cells
+        {
+            get
+            {
+                if (_cells == null)
+                {
+                    _cells = new CellSet();
+                    _cells.Changed += ScheduleFilterRefresh;
+                }
+                return _cells;
+            }
+        }
+
+        public ObservableCollection<FilterChip> FilterChips { get; } = new ObservableCollection<FilterChip>();
+
+        public bool ShowFilters
+        {
+            get => _lib.ShowFilters;
+            set
+            {
+                if (_lib.ShowFilters == value) return;
+                _lib.ShowFilters = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(FilterPanelVisible));
+                ScheduleSave();
+            }
+        }
+
+        private bool _duplicatesOnly;
+        public bool DuplicatesOnly
+        {
+            get => _duplicatesOnly;
+            set { if (Set(ref _duplicatesOnly, value)) ScheduleFilterRefresh(); }
+        }
+
+        private double _cMin, _cMax = 1, _wMin, _wMax = 1, _pMin, _pMax = 1, _xMin, _xMax = 1;
+        public double ContrastMin { get => _cMin; set { if (Set(ref _cMin, value)) RangeChanged(); } }
+        public double ContrastMax { get => _cMax; set { if (Set(ref _cMax, value)) RangeChanged(); } }
+        public double WeightMin { get => _wMin; set { if (Set(ref _wMin, value)) RangeChanged(); } }
+        public double WeightMax { get => _wMax; set { if (Set(ref _wMax, value)) RangeChanged(); } }
+        public double WidthMin { get => _pMin; set { if (Set(ref _pMin, value)) RangeChanged(); } }
+        public double WidthMax { get => _pMax; set { if (Set(ref _pMax, value)) RangeChanged(); } }
+        public double XHeightMin { get => _xMin; set { if (Set(ref _xMin, value)) RangeChanged(); } }
+        public double XHeightMax { get => _xMax; set { if (Set(ref _xMax, value)) RangeChanged(); } }
+
+        public string ContrastRange => $"{_cMin:0.00} – {_cMax:0.00}";
+        public string WeightRange => $"{_wMin:0.00} – {_wMax:0.00}";
+        public string WidthRange => $"{_pMin:0.00} – {_pMax:0.00}";
+        public string XHeightRange => $"{_xMin:0.00} – {_xMax:0.00}";
+
+        private void RangeChanged()
+        {
+            foreach (var p in new[] { nameof(ContrastRange), nameof(WeightRange), nameof(WidthRange), nameof(XHeightRange) })
+                OnPropertyChanged(p);
+            ScheduleFilterRefresh();
+        }
+
+        public void ResetRange(string which)
+        {
+            switch (which)
+            {
+                case "c": ContrastMin = 0; ContrastMax = 1; break;
+                case "w": WeightMin = 0; WeightMax = 1; break;
+                case "p": WidthMin = 0; WidthMax = 1; break;
+                case "x": XHeightMin = 0; XHeightMax = 1; break;
+            }
+        }
+
+        private double[] _cHist, _wHist, _pHist, _xHist;
+        public double[] ContrastHist { get => _cHist; private set => Set(ref _cHist, value); }
+        public double[] WeightHist { get => _wHist; private set => Set(ref _wHist, value); }
+        public double[] WidthHist { get => _pHist; private set => Set(ref _pHist, value); }
+        public double[] XHeightHist { get => _xHist; private set => Set(ref _xHist, value); }
+
+        private static bool Full(double min, double max) => min <= 0.001 && max >= 0.999;
+
+        public int ActiveFilterCount =>
+            Cells.Count + FilterChips.Count(c => c.IsSelected) + (DuplicatesOnly ? 1 : 0)
+            + (Full(_cMin, _cMax) ? 0 : 1) + (Full(_wMin, _wMax) ? 0 : 1) + (Full(_pMin, _pMax) ? 0 : 1) + (Full(_xMin, _xMax) ? 0 : 1);
+
+        public bool HasActiveFilters => ActiveFilterCount > 0;
+        public string FiltersButtonText => ActiveFilterCount > 0 ? $"Filteri · {ActiveFilterCount}" : "Filteri";
+
+        private bool _filterRefreshPending;
+        private void ScheduleFilterRefresh()
+        {
+            OnPropertyChanged(nameof(ActiveFilterCount));
+            OnPropertyChanged(nameof(HasActiveFilters));
+            OnPropertyChanged(nameof(FiltersButtonText));
+            if (_filterRefreshPending) return;
+            _filterRefreshPending = true;
+            Dispatcher.CurrentDispatcher.BeginInvoke(new Action(() =>
+            {
+                _filterRefreshPending = false;
+                Refresh();
+            }), DispatcherPriority.Background);
+        }
+
+        public void ChipsChanged() => ScheduleFilterRefresh();
+
+        public void ResetFilters()
+        {
+            Cells.Clear();
+            foreach (var c in FilterChips) c.IsSelected = false;
+            _duplicatesOnly = false;
+            OnPropertyChanged(nameof(DuplicatesOnly));
+            _cMin = _wMin = _pMin = _xMin = 0;
+            _cMax = _wMax = _pMax = _xMax = 1;
+            foreach (var p in new[] { nameof(ContrastMin), nameof(ContrastMax), nameof(WeightMin), nameof(WeightMax),
+                         nameof(WidthMin), nameof(WidthMax), nameof(XHeightMin), nameof(XHeightMax) })
+                OnPropertyChanged(p);
+            RangeChanged();
+        }
+
+        private static int Cls(double v) => v < 1.0 / 3 ? 0 : v < 2.0 / 3 ? 1 : 2;
+
+        private static bool InRange(double v, double min, double max)
+            => Full(min, max) || (!double.IsNaN(v) && v >= min - 1e-9 && v <= max + 1e-9);
+
+        private bool CellOk(char row, double v)
+        {
+            if (!Cells.Any(row)) return true;
+            return !double.IsNaN(v) && Cells.Has(row, Cls(v));
+        }
+
+        private bool PassesAdvanced(FontItem f)
+        {
+            if (DuplicatesOnly && !f.IsDuplicate) return false;
+            if (!CellOk('c', f.ContrastN) || !CellOk('w', f.WeightN) || !CellOk('p', f.WidthN)) return false;
+            if (Cells.Any('s') && (f.SerifClass < 0 || !Cells.Has('s', f.SerifClass))) return false;
+            if (!InRange(f.ContrastN, _cMin, _cMax) || !InRange(f.WeightN, _wMin, _wMax)
+                || !InRange(f.WidthN, _pMin, _pMax) || !InRange(f.XHeightN, _xMin, _xMax)) return false;
+            foreach (var c in FilterChips)
+                if (c.IsSelected && !FontHasChip(f, c)) return false;
+            return true;
+        }
+
+        private static string CategoryLabel(string cat) => cat switch
+        {
+            "Sans Serif" => "Sans serif",
+            "Serif" => "Serif",
+            "Display" => "Display",
+            "Handwriting" => "Rukopisni",
+            "Monospace" => "Monospace",
+            _ => null
+        };
+
+        private static bool FontHasChip(FontItem f, FilterChip c)
+        {
+            if (c.IsUserTag) return f.Tags.Contains(c.Name);
+            switch (c.Name)
+            {
+                case "Varijabilni": return f.IsVariable;
+                case "Monospace": return f.IsMono == true || f.Category == "Monospace";
+                case "Hrvatski znakovi": return f.HasCroatian == true;
+                case "Favoriti": return f.IsFavorite;
+                default: return CategoryLabel(f.Category) == c.Name;
+            }
+        }
+
+        private void RebuildChips()
+        {
+            var selected = new HashSet<string>(FilterChips.Where(c => c.IsSelected).Select(c => (c.IsUserTag ? "#" : "") + c.Name));
+            var list = new List<FilterChip>();
+            foreach (var label in new[] { "Sans serif", "Serif", "Display", "Rukopisni" })
+                if (_all.Any(f => CategoryLabel(f.Category) == label)) list.Add(new FilterChip { Name = label });
+            foreach (var n in new[] { "Monospace", "Varijabilni", "Hrvatski znakovi", "Favoriti" })
+                list.Add(new FilterChip { Name = n });
+            foreach (var t in AllTagNames)
+                list.Add(new FilterChip { Name = t, IsUserTag = true });
+            foreach (var c in list) c.IsSelected = selected.Contains((c.IsUserTag ? "#" : "") + c.Name);
+            FilterChips.Clear();
+            foreach (var c in list) FilterChips.Add(c);
+        }
+
+        private void AssignCategories()
+        {
+            if (_google == null) return;
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var g in _google) map[g.Family] = g.Category;
+            foreach (var f in _all)
+                f.Category = map.TryGetValue(f.Name, out var c) ? c : null;
+            RebuildChips();
+        }
+
+        private static (Func<double, double> norm, double[] hist) Normalize(List<double> values)
+        {
+            var v = values.Where(x => !double.IsNaN(x) && !double.IsInfinity(x)).OrderBy(x => x).ToList();
+            if (v.Count < 2) return (x => double.NaN, new double[40]);
+            double lo = v[(int)(v.Count * 0.02)], hi = v[Math.Min(v.Count - 1, (int)(v.Count * 0.98))];
+            if (hi - lo < 1e-9) hi = lo + 1e-9;
+            Func<double, double> norm = x => double.IsNaN(x) ? double.NaN : Math.Max(0, Math.Min(1, (x - lo) / (hi - lo)));
+            var hist = new double[40];
+            foreach (var x in v) hist[Math.Min(39, (int)(norm(x) * 40))]++;
+            return (norm, hist);
+        }
+
+        private void RecomputeMetrics()
+        {
+            var c = Normalize(_all.Select(f => f.ContrastRaw).ToList());
+            var w = Normalize(_all.Select(f => f.WeightRaw).ToList());
+            var p = Normalize(_all.Select(f => f.WidthRaw).ToList());
+            var x = Normalize(_all.Select(f => f.XHeightRaw).ToList());
+            foreach (var f in _all)
+            {
+                f.ContrastN = c.norm(f.ContrastRaw);
+                f.WeightN = w.norm(f.WeightRaw);
+                f.WidthN = p.norm(f.WidthRaw);
+                f.XHeightN = x.norm(f.XHeightRaw);
+            }
+            ContrastHist = c.hist;
+            WeightHist = w.hist;
+            WidthHist = p.hist;
+            XHeightHist = x.hist;
+        }
+
+        #endregion
+
         #region Google Fonts
 
         private List<GoogleFontEntry> _google;
@@ -1089,6 +1354,8 @@ namespace FontShelf.ViewModels
                 var list = await GoogleFontsService.LoadCatalogAsync(force);
                 foreach (var e in list) e.IsDownloaded = GoogleFontsService.IsDownloaded(e.Family);
                 _google = list;
+                SyncGoogleActiveState();
+                AssignCategories();
                 GoogleView = new ListCollectionView(_google) { Filter = FilterGoogle };
                 GoogleVisibleCount = GoogleView.Count;
                 GoogleStatus = "";
@@ -1116,22 +1383,49 @@ namespace FontShelf.ViewModels
             GoogleVisibleCount = GoogleView.Count;
         }
 
-        public async Task DownloadGoogleAsync(GoogleFontEntry e)
+        /// <summary>Jedan klik: po potrebi tiho preuzme font i aktivira ga (ili ga deaktivira).</summary>
+        public async Task ToggleGoogleAsync(GoogleFontEntry e)
         {
             if (e == null || e.IsDownloading) return;
+            var font = FindDownloadedGoogleFont(e);
+            if (font != null && font.IsActivated)
+            {
+                await SetActivatedAsync(new[] { font }, false);
+                e.IsActive = false;
+                return;
+            }
+
             e.IsDownloading = true;
             try
             {
-                var n = await GoogleFontsService.DownloadAsync(e);
-                e.IsDownloaded = true;
-                await ReloadFolderAsync(GoogleFontsService.Dir);
-                StatusText = $"Preuzet „{e.Family}” ({n} {Plural.Of(n, "stil", "stila", "stilova")}) — nalazi se u mapi Google Fonts.";
+                if (font == null)
+                {
+                    if (!GoogleFontsService.IsDownloaded(e.Family)) await GoogleFontsService.DownloadAsync(e);
+                    e.IsDownloaded = true;
+                    await ReloadFolderAsync(GoogleFontsService.Dir);
+                    font = FindDownloadedGoogleFont(e);
+                }
+                if (font != null)
+                {
+                    await SetActivatedAsync(new[] { font }, true);
+                    e.IsActive = font.IsActivated;
+                }
             }
             catch (Exception ex)
             {
-                StatusText = $"Preuzimanje „{e.Family}” nije uspjelo: {ex.Message}";
+                StatusText = $"„{e.Family}” nije moguće aktivirati: {ex.Message}";
             }
             e.IsDownloading = false;
+        }
+
+        private void SyncGoogleActiveState()
+        {
+            if (_google == null) return;
+            var active = new HashSet<string>(_all.Where(f => f.IsActivated && f.FolderPath != null
+                    && f.FolderPath.StartsWith(GoogleFontsService.Dir, StringComparison.OrdinalIgnoreCase))
+                .Select(f => Path.GetFileName(Path.GetDirectoryName(f.FirstFile) ?? "")), StringComparer.OrdinalIgnoreCase);
+            foreach (var e in _google)
+                e.IsActive = active.Contains(Path.GetFileName(GoogleFontsService.FamilyDir(e.Family)));
         }
 
         private readonly System.Threading.SemaphoreSlim _previewGate = new System.Threading.SemaphoreSlim(6);

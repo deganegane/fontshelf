@@ -152,6 +152,20 @@ namespace FontShelf.Models
         private string _manufacturer = "";
         public string Manufacturer { get => _manufacturer; set => Set(ref _manufacturer, value); }
 
+        // Izmjereni oblici (0–1 nakon normalizacije, NaN = nepoznato)
+        public double ContrastN { get; set; } = double.NaN;
+        public double WeightN { get; set; } = double.NaN;
+        public double WidthN { get; set; } = double.NaN;
+        public double XHeightN { get; set; } = double.NaN;
+        public double ContrastRaw { get; set; } = double.NaN;
+        public double WeightRaw { get; set; } = double.NaN;
+        public double WidthRaw { get; set; } = double.NaN;
+        public double XHeightRaw { get; set; } = double.NaN;
+        /// <summary>-1 nepoznato, 0 sans, 1 serif, 2 slab</summary>
+        public int SerifClass { get; set; } = -1;
+        /// <summary>Kategorija iz Google Fonts kataloga (ako je font tamo).</summary>
+        public string Category { get; set; }
+
         /// <summary>Glavna datoteka (za instalirane fontove, otkrivena analizom).</summary>
         public string MainFile { get; set; }
     }
@@ -211,7 +225,18 @@ namespace FontShelf.Models
         private string _previewStatus = "Učitavam pregled…";
         public string PreviewStatus { get => _previewStatus; set => Set(ref _previewStatus, value); }
 
-        public string ButtonText => IsDownloading ? "Preuzimam…" : IsDownloaded ? "Preuzeto ✓" : "Preuzmi";
+        private bool _isActive;
+        public bool IsActive { get => _isActive; set { if (Set(ref _isActive, value)) OnPropertyChanged(nameof(ButtonText)); } }
+
+        public string ButtonText => IsDownloading ? "Aktiviram…" : IsActive ? "Aktivno ✓" : "Aktiviraj";
+    }
+
+    public class FilterChip : ObservableObject
+    {
+        public string Name { get; set; }
+        public bool IsUserTag { get; set; }
+        private bool _isSelected;
+        public bool IsSelected { get => _isSelected; set => Set(ref _isSelected, value); }
     }
 
     public enum SortMode { NameAsc, NameDesc, Styles, Recent, FavoritesFirst }
@@ -232,6 +257,7 @@ namespace FontShelf.Models
         public bool LightTheme { get; set; }
         /// <summary>0 = prati Windows, 1 = svijetla, 2 = tamna</summary>
         public int ThemeMode { get; set; }
+        public bool ShowFilters { get; set; }
         public SortMode Sort { get; set; } = SortMode.NameAsc;
         public ViewMode View { get; set; } = ViewMode.List;
         public PreviewMode Preview { get; set; } = PreviewMode.Line;
