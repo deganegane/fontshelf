@@ -261,12 +261,15 @@
         </StackPanel>
 
         <Grid Grid.Column="1">
+            <!-- Stupci prate raspored sloja ispod: [filteri] [glavni prikaz] [inspektor 410] -->
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="410"/>
             </Grid.ColumnDefinitions>
-            <Border Width="420" Height="36" CornerRadius="9" Background="{DynamicResource InputBrush}" HorizontalAlignment="Left"
-                    Margin="33,0,0,0" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+            <Border Width="286" Visibility="{Binding FilterPanelVisible, Converter={StaticResource BoolVis}}"/>
+            <Border Grid.Column="1" Height="36" CornerRadius="9" Background="{DynamicResource InputBrush}" HorizontalAlignment="Stretch"
+                    Margin="33,0,24,0" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -284,7 +287,8 @@
                     </Border>
                 </Grid>
             </Border>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True">
                 <Button Style="{StaticResource CaptionButton}" Content="&#xE921;" Click="Minimize_Click" ToolTip="Smanji"/>
                 <Button x:Name="MaxButton" Style="{StaticResource CaptionButton}" Content="&#xE922;" Click="Maximize_Click" ToolTip="Povećaj"/>
                 <Button Style="{StaticResource CloseCaptionButton}" Content="&#xE8BB;" Click="Close_Click" ToolTip="Zatvori"/>
