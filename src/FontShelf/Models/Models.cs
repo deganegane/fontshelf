@@ -222,6 +222,8 @@ namespace FontShelf.Models
         public bool HideSystemFonts { get; set; }
         public bool TemporaryActivation { get; set; }
         public bool LightTheme { get; set; }
+        /// <summary>0 = prati Windows, 1 = svijetla, 2 = tamna</summary>
+        public int ThemeMode { get; set; }
         public SortMode Sort { get; set; } = SortMode.NameAsc;
         public ViewMode View { get; set; } = ViewMode.List;
         public PreviewMode Preview { get; set; } = PreviewMode.Line;

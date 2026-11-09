@@ -12,6 +12,10 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Shell;
+using System.Windows.Threading;
 using FontShelf.Models;
 using FontShelf.Services;
 using FontShelf.ViewModels;
@@ -25,11 +29,30 @@ namespace FontShelf
         private readonly MainViewModel _vm = new MainViewModel();
         private bool _syncing;
 
+        private readonly DispatcherTimer _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3.5) };
+
         public MainWindow()
         {
+            // Mica pozadina samo na Windows 11 22H2+ (inače puna boja)
+            ThemeManager.UseMica = Environment.OSVersion.Version.Build >= 22621;
             _vm.ApplyInitialTheme();
             InitializeComponent();
+            WindowChrome.SetWindowChrome(this, new WindowChrome
+            {
+                CaptionHeight = 48,
+                ResizeBorderThickness = new Thickness(6),
+                GlassFrameThickness = ThemeManager.UseMica ? new Thickness(-1) : new Thickness(0),
+                CornerRadius = new CornerRadius(8),
+                UseAeroCaptionButtons = false
+            });
             DataContext = _vm;
+            _toastTimer.Tick += (s, e) =>
+            {
+                if (_vm.IsBusy) return;
+                _toastTimer.Stop();
+                Toast.BeginAnimation(OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(400)));
+            };
+            SystemEvents.UserPreferenceChanged += OnSystemPreferenceChanged;
             _vm.RequestSelectAll += SelectAllEntry;
             _vm.ThemeChanged += () =>
             {
@@ -43,6 +66,35 @@ namespace FontShelf
         {
             if (e.PropertyName == nameof(MainViewModel.SelectedFont) || e.PropertyName == nameof(MainViewModel.ShowTester))
                 _ = UpdateTesterAsync();
+            else if (e.PropertyName == nameof(MainViewModel.StatusText))
+                ShowToast();
+            else if (e.PropertyName == nameof(MainViewModel.IsBusy))
+            {
+                if (_vm.IsBusy)
+                {
+                    SpinnerRotate.BeginAnimation(RotateTransform.AngleProperty,
+                        new DoubleAnimation(0, 360, TimeSpan.FromSeconds(1)) { RepeatBehavior = RepeatBehavior.Forever });
+                    ShowToast();
+                }
+                else SpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, null);
+            }
+        }
+
+        private void ShowToast()
+        {
+            if (string.IsNullOrWhiteSpace(_vm.StatusText)) return;
+            Toast.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(150)));
+            _toastTimer.Stop();
+            _toastTimer.Start();
+        }
+
+        private void OnSystemPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+        {
+            if (e.Category == UserPreferenceCategory.General && _vm.ThemeMode == 0)
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (_vm.EffectiveLight != ThemeManager.IsLight) _vm.ApplyTheme();
+                }));
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -52,25 +104,92 @@ namespace FontShelf
                 SelectAllEntry();
         }
 
-        private void Window_Closing(object sender, CancelEventArgs e) => _vm.OnClosing();
+        private void Window_Closing(object sender, CancelEventArgs e)
+        {
+            SystemEvents.UserPreferenceChanged -= OnSystemPreferenceChanged;
+            _vm.OnClosing();
+        }
 
-        #region Tamna naslovna traka
+        #region Prozor i naslovna traka
 
         [DllImport("dwmapi.dll")]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
-        private void Window_SourceInitialized(object sender, EventArgs e) => ApplyTitleBar();
+        private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+        private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+        private const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
+
+        private IntPtr Handle => new WindowInteropHelper(this).Handle;
+
+        private void Window_SourceInitialized(object sender, EventArgs e)
+        {
+            try
+            {
+                int round = 2;
+                DwmSetWindowAttribute(Handle, DWMWA_WINDOW_CORNER_PREFERENCE, ref round, sizeof(int));
+            }
+            catch { }
+
+            if (ThemeManager.UseMica)
+            {
+                try
+                {
+                    var src = HwndSource.FromHwnd(Handle);
+                    if (src?.CompositionTarget != null) src.CompositionTarget.BackgroundColor = Colors.Transparent;
+                    int mica = 2; // DWMSBT_MAINWINDOW
+                    if (DwmSetWindowAttribute(Handle, DWMWA_SYSTEMBACKDROP_TYPE, ref mica, sizeof(int)) != 0)
+                        DisableMica();
+                }
+                catch { DisableMica(); }
+            }
+            ApplyTitleBar();
+        }
+
+        private void DisableMica()
+        {
+            ThemeManager.UseMica = false;
+            var chrome = WindowChrome.GetWindowChrome(this);
+            if (chrome != null) chrome.GlassFrameThickness = new Thickness(0);
+            ThemeManager.Apply(ThemeManager.IsLight);
+        }
 
         private void ApplyTitleBar()
         {
             try
             {
-                var h = new WindowInteropHelper(this).Handle;
-                if (h == IntPtr.Zero) return;
-                int dark = _vm.LightTheme ? 0 : 1;
-                DwmSetWindowAttribute(h, 20, ref dark, sizeof(int));
+                if (Handle == IntPtr.Zero) return;
+                int dark = ThemeManager.IsLight ? 0 : 1;
+                DwmSetWindowAttribute(Handle, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
             }
             catch { }
+        }
+
+        private void Window_StateChanged(object sender, EventArgs e)
+        {
+            bool max = WindowState == WindowState.Maximized;
+            RootGrid.Margin = max ? new Thickness(7) : new Thickness(0);
+            MaxButton.Content = max ? "\uE923" : "\uE922";
+            MaxButton.ToolTip = max ? "Vrati" : "Povećaj";
+        }
+
+        private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+        private void Maximize_Click(object sender, RoutedEventArgs e)
+            => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+        private void Close_Click(object sender, RoutedEventArgs e) => Close();
+
+        private void Settings_Click(object sender, RoutedEventArgs e) => SettingsPopup.IsOpen = !SettingsPopup.IsOpen;
+
+        private void More_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button b && b.ContextMenu != null)
+            {
+                b.ContextMenu.PlacementTarget = b;
+                b.ContextMenu.Placement = PlacementMode.Bottom;
+                b.ContextMenu.DataContext = _vm;
+                b.ContextMenu.IsOpen = true;
+            }
         }
 
         #endregion
@@ -151,11 +270,33 @@ namespace FontShelf
             ((sender as FrameworkElement)?.Parent as UIElement)?.RaiseEvent(ev);
         }
 
+        private void NewTag_Click(object sender, RoutedEventArgs e)
+        {
+            NewTagBox.Visibility = Visibility.Visible;
+            NewTagBox.Focus();
+        }
+
+        private void NewTagBox_LostFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(NewTagBox.Text)) NewTagBox.Visibility = Visibility.Collapsed;
+        }
+
         private void NewTagBox_KeyDown(object sender, KeyEventArgs e)
         {
+            if (e.Key == Key.Escape)
+            {
+                NewTagBox.Text = "";
+                NewTagBox.Visibility = Visibility.Collapsed;
+                e.Handled = true;
+                return;
+            }
             if (e.Key != Key.Enter) return;
             var name = NewTagBox.Text;
-            if (_vm.CreateTag(name)) NewTagBox.Text = "";
+            if (_vm.CreateTag(name))
+            {
+                NewTagBox.Text = "";
+                NewTagBox.Visibility = Visibility.Collapsed;
+            }
             else if (!string.IsNullOrWhiteSpace(name)) _vm.StatusText = "Tag s tim imenom već postoji.";
             e.Handled = true;
         }
@@ -237,6 +378,12 @@ namespace FontShelf
         {
             var f = Ctx<FontItem>(sender);
             if (f != null) _vm.SelectedFont = f;
+        }
+
+        private async void RowActivate_Click(object sender, RoutedEventArgs e)
+        {
+            var f = Ctx<FontItem>(sender);
+            if (f != null) await _vm.ToggleActivationAsync(f);
         }
 
         private void CompareToggle_Click(object sender, RoutedEventArgs e)

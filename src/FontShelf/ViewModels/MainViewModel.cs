@@ -94,6 +94,7 @@ namespace FontShelf.ViewModels
                 OnPropertyChanged(nameof(CompareB));
             };
             FolderEntries.CollectionChanged += (s, e) => OnPropertyChanged(nameof(HasFolders));
+            TagEntries.CollectionChanged += (s, e) => OnPropertyChanged(nameof(HasTags));
         }
 
         #region Osnovna svojstva
@@ -204,6 +205,7 @@ namespace FontShelf.ViewModels
         public FontItem CompareA => CompareFonts.Count > 0 ? CompareFonts[0] : null;
         public FontItem CompareB => CompareFonts.Count > 1 ? CompareFonts[1] : null;
         public bool HasFolders => FolderEntries.Count > 0;
+        public bool HasTags => TagEntries.Count > 0;
 
         private string _statusText = "";
         public string StatusText { get => _statusText; set => Set(ref _statusText, value); }
@@ -414,18 +416,31 @@ namespace FontShelf.ViewModels
             }
         }
 
-        public bool LightTheme
+        public int ThemeMode
         {
-            get => _lib.LightTheme;
+            get => _lib.ThemeMode;
             set
             {
-                if (_lib.LightTheme == value) return;
-                _lib.LightTheme = value;
-                OnPropertyChanged();
-                ThemeManager.Apply(value);
-                ThemeChanged?.Invoke();
+                if (_lib.ThemeMode == value) return;
+                _lib.ThemeMode = value;
+                OnPropertyChanged(nameof(ThemeMode));
+                OnPropertyChanged(nameof(IsThemeSystem));
+                OnPropertyChanged(nameof(IsThemeLight));
+                OnPropertyChanged(nameof(IsThemeDark));
+                ApplyTheme();
                 ScheduleSave();
             }
+        }
+        public bool IsThemeSystem { get => ThemeMode == 0; set { if (value) ThemeMode = 0; } }
+        public bool IsThemeLight { get => ThemeMode == 1; set { if (value) ThemeMode = 1; } }
+        public bool IsThemeDark { get => ThemeMode == 2; set { if (value) ThemeMode = 2; } }
+
+        public bool EffectiveLight => ThemeMode == 1 || (ThemeMode == 0 && ThemeManager.SystemPrefersLight());
+
+        public void ApplyTheme()
+        {
+            ThemeManager.Apply(EffectiveLight);
+            ThemeChanged?.Invoke();
         }
 
         #endregion
@@ -467,7 +482,7 @@ namespace FontShelf.ViewModels
         public void ApplyInitialTheme()
         {
             _lib = LibraryStore.Load();
-            ThemeManager.Apply(_lib.LightTheme);
+            ThemeManager.Apply(EffectiveLight);
         }
 
         public async Task InitializeAsync()
@@ -476,7 +491,7 @@ namespace FontShelf.ViewModels
             _previewSize = _lib.PreviewSize;
             foreach (var p in new[] { nameof(PreviewText), nameof(EffectivePreviewText), nameof(PreviewSize), nameof(PreviewSizeText),
                          nameof(CardText), nameof(CardFontSize), nameof(CardWrap), nameof(OverlaySize), nameof(HideSystemFonts),
-                         nameof(TemporaryActivation), nameof(LightTheme), nameof(SortText), nameof(IsLinePreview),
+                         nameof(TemporaryActivation), nameof(IsThemeSystem), nameof(IsThemeLight), nameof(IsThemeDark), nameof(SortText), nameof(IsLinePreview),
                          nameof(IsParagraphPreview), nameof(IsAlphabetPreview) })
                 OnPropertyChanged(p);
             if (View == ViewMode.Compare) _lib.View = ViewMode.List;

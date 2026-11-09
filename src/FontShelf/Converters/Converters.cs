@@ -5,6 +5,15 @@ using System.Windows.Data;
 
 namespace FontShelf.Converters
 {
+    public class TagBrushConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            => FontShelf.Services.ThemeManager.TagBrush(value as string);
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+    }
+
     public class BoolToVisibilityConverter : IValueConverter
     {
         public bool Invert { get; set; }
