@@ -29,12 +29,6 @@ jobs:
           -p:Version=1.0.${{ github.run_number }}
           -o out
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: FontShelf
-          path: out/FontShelf.exe
-
       - name: Create release
         shell: bash
         env:
