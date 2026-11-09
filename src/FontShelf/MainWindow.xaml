@@ -265,8 +265,8 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Border Width="380" Height="34" CornerRadius="8" Background="{DynamicResource InputBrush}" HorizontalAlignment="Left"
-                    Margin="10,0,0,0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+            <Border Width="420" Height="36" CornerRadius="9" Background="{DynamicResource InputBrush}" HorizontalAlignment="Left"
+                    Margin="33,0,0,0" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -388,6 +388,15 @@
                     <CheckBox Style="{StaticResource Switch}" Content="Privremena aktivacija" IsChecked="{Binding TemporaryActivation}"/>
                     <TextBlock Text="Aktivirani fontovi se sami deaktiviraju kad zatvoriš FontShelf."
                                TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource SubTextBrush}" Margin="0,0,40,0"/>
+
+                    <TextBlock Text="O aplikaciji" Style="{StaticResource DetailTitle}" Margin="0,20,0,6"/>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Margin="0" Content="Nove verzije"
+                                ToolTip="Otvori stranicu s izdanjima na GitHubu" Click="OpenReleases_Click"/>
+                        <TextBlock VerticalAlignment="Center">
+                            <Run Text="FontShelf "/><Run Text="{Binding AppVersion, Mode=OneWay}" FontWeight="SemiBold"/>
+                        </TextBlock>
+                    </DockPanel>
                 </StackPanel>
             </Border>
         </Popup>

@@ -70,6 +70,15 @@ namespace FontShelf.ViewModels
         public ObservableCollection<FontItem> CompareFonts { get; } = new ObservableCollection<FontItem>();
         public ObservableCollection<string> SuggestedTags { get; } = new ObservableCollection<string>();
 
+        public string AppVersion
+        {
+            get
+            {
+                var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+                return v == null ? "" : $"build {v.Build}";
+            }
+        }
+
         public string Upper => UpperSample;
         public string Lower => LowerSample;
         public string Digits => DigitSample;

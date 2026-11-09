@@ -193,6 +193,12 @@ namespace FontShelf
 
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
+        private void OpenReleases_Click(object sender, RoutedEventArgs e)
+        {
+            try { Process.Start(new ProcessStartInfo("https://github.com/deganegane/fontshelf/releases/latest") { UseShellExecute = true }); }
+            catch { }
+        }
+
         private void Settings_Click(object sender, RoutedEventArgs e) => SettingsPopup.IsOpen = !SettingsPopup.IsOpen;
 
         private void More_Click(object sender, RoutedEventArgs e)

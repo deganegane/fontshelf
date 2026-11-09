@@ -586,7 +586,7 @@
                             <Border x:Name="Bd" Background="Transparent" CornerRadius="10" Padding="20,14,12,16" Margin="0,2">
                                 <ContentPresenter/>
                             </Border>
-                            <Border x:Name="Sep" Height="1" VerticalAlignment="Bottom" Margin="20,0" Background="{DynamicResource LineBrush}"/>
+                            <Border x:Name="Sep" Height="1" VerticalAlignment="Bottom" Margin="20,0,0,0" Background="{DynamicResource LineBrush}"/>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
