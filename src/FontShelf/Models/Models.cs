@@ -49,6 +49,9 @@ namespace FontShelf.Models
         public string FilePath { get; set; }
         public bool CanToggle => FilePath != null;
 
+        /// <summary>Datoteka stila za instalirane fontove (samo za čitanje, ne za aktivaciju).</summary>
+        public string SourceFile { get; set; }
+
         public int WeightValue => Weight.ToOpenTypeWeight();
         public bool IsItalic => Style != FontStyles.Normal;
 
@@ -165,6 +168,9 @@ namespace FontShelf.Models
         public int SerifClass { get; set; } = -1;
         /// <summary>Kategorija iz Google Fonts kataloga (ako je font tamo).</summary>
         public string Category { get; set; }
+
+        /// <summary>Sve datoteke instaliranog fonta (ako su poznate).</summary>
+        public List<string> SystemFiles { get; set; }
 
         /// <summary>Ako je ovo privremeni pregled Google fonta (nije u biblioteci).</summary>
         public GoogleFontEntry GoogleEntry { get; set; }

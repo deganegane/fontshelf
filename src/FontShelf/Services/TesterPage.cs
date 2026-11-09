@@ -27,7 +27,7 @@ namespace FontShelf.Services
             var styleFiles = new List<(FontStyleItem style, string file)>();
             foreach (var s in f.Styles)
             {
-                string file = s.FilePath;
+                string file = s.FilePath ?? s.SourceFile;
                 if (file == null)
                 {
                     var g = FontAnalyzer.GetGlyphTypeface(f, s);

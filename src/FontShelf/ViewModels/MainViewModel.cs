@@ -515,6 +515,7 @@ namespace FontShelf.ViewModels
             var folders = _lib.Folders.Where(Directory.Exists).ToList();
             _lib.Folders = folders;
 
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var loaded = await Task.Run(() =>
             {
                 var list = new List<FontItem>(FontLoader.LoadSystem());
@@ -542,10 +543,18 @@ namespace FontShelf.ViewModels
                 });
             }
 
+            var tLoad = sw.Elapsed.TotalSeconds;
             StatusText = "Analiziram fontove…";
             await AnalyzeAsync(_all.ToList());
+            var tAll = sw.Elapsed.TotalSeconds;
             IsBusy = false;
-            StatusText = $"{Plural.Fonts(_all.Count)} u biblioteci";
+            StatusText = $"{Plural.Fonts(_all.Count)} učitano za {tAll:0.0} s (popis {tLoad:0.0} s, analiza {tAll - tLoad:0.0} s)";
+            try
+            {
+                File.AppendAllText(Path.Combine(AppPaths.Local, "startup-log.txt"),
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  fontova={_all.Count}  popis={tLoad:0.00}s  ukupno={tAll:0.00}s{Environment.NewLine}");
+            }
+            catch { }
             ScheduleSave();
             _ = EnsureGoogleAsync();
         }

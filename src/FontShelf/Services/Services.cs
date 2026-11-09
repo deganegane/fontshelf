@@ -221,7 +221,157 @@ namespace FontShelf.Services
             S = s.Stretch.ToOpenTypeStretch()
         }).ToList();
 
+        // ---------- Brzo učitavanje instaliranih fontova (registar + vlastiti čitač, keš po datoteci) ----------
+        public class FileFaces
+        {
+            public string Stamp { get; set; }
+            public List<FaceInfo> Faces { get; set; }
+        }
+
+        private static string FastCachePath => Path.Combine(AppPaths.Local, "installed-fonts-cache-v1.json");
+
+        private static IEnumerable<string> RegisteredFontFiles()
+        {
+            var winFonts = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var root in new[] { Registry.LocalMachine, Registry.CurrentUser })
+            {
+                RegistryKey key = null;
+                try { key = root.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"); } catch { }
+                if (key == null) continue;
+                using (key)
+                {
+                    foreach (var name in key.GetValueNames())
+                    {
+                        if (!(key.GetValue(name) is string v) || string.IsNullOrWhiteSpace(v)) continue;
+                        var path = Path.IsPathRooted(v) ? v : Path.Combine(winFonts, v);
+                        if (IsFontFile(path) && seen.Add(path)) yield return path;
+                    }
+                }
+            }
+        }
+
+        private static FontFamily FileFamily(string file, IEnumerable<string> names)
+        {
+            var uri = new Uri(file).AbsoluteUri;
+            var src = string.Join(", ", names.Where(n => !string.IsNullOrWhiteSpace(n)).Distinct()
+                .Select(n => uri + "#" + n.Replace(",", "")));
+            return new FontFamily(src);
+        }
+
+        /// <summary>Brzi put: bez Fonts.SystemFontFamilies (koji kod tisuća fontova traje desetke sekundi).</summary>
+        public static List<FontItem> LoadSystemFast()
+        {
+            Dictionary<string, FileFaces> cache;
+            try
+            {
+                cache = File.Exists(FastCachePath)
+                    ? JsonSerializer.Deserialize<Dictionary<string, FileFaces>>(File.ReadAllText(FastCachePath))
+                    : null;
+            }
+            catch { cache = null; }
+            cache ??= new Dictionary<string, FileFaces>(StringComparer.OrdinalIgnoreCase);
+            var fresh = new Dictionary<string, FileFaces>(StringComparer.OrdinalIgnoreCase);
+            bool changed = false;
+
+            // obitelj → (datoteka, lice)
+            var groups = new Dictionary<string, List<(string file, FaceInfo face)>>(StringComparer.OrdinalIgnoreCase);
+            var order = new List<string>();
+            foreach (var file in RegisteredFontFiles())
+            {
+                string stamp;
+                try
+                {
+                    var fi = new FileInfo(file);
+                    if (!fi.Exists) continue;
+                    stamp = fi.Length + "|" + fi.LastWriteTimeUtc.Ticks;
+                }
+                catch { continue; }
+
+                List<FaceInfo> faces;
+                if (cache.TryGetValue(file, out var c) && c.Stamp == stamp && c.Faces != null) faces = c.Faces;
+                else
+                {
+                    faces = OpenTypeReader.ReadFaces(file);
+                    changed = true;
+                }
+                fresh[file] = new FileFaces { Stamp = stamp, Faces = faces };
+
+                foreach (var f in faces)
+                {
+                    if (!groups.TryGetValue(f.Family, out var l))
+                    {
+                        groups[f.Family] = l = new List<(string, FaceInfo)>();
+                        order.Add(f.Family);
+                    }
+                    l.Add((file, f));
+                }
+            }
+            if (cache.Count != fresh.Count) changed = true;
+            if (changed)
+            {
+                try
+                {
+                    Directory.CreateDirectory(AppPaths.Local);
+                    File.WriteAllText(FastCachePath, JsonSerializer.Serialize(fresh));
+                }
+                catch { }
+            }
+
+            var list = new List<FontItem>();
+            foreach (var name in order)
+            {
+                var faces = groups[name];
+                var regular = faces.OrderBy(x => x.face.Italic != 0 ? 1 : 0)
+                                   .ThenBy(x => Math.Abs(x.face.Width - 5))
+                                   .ThenBy(x => Math.Abs(x.face.Weight - 400)).First();
+                var family = FileFamily(regular.file, new[] { name, regular.face.Legacy });
+                var styles = new List<FontStyleItem>();
+                var seenFaces = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var (file, face) in faces)
+                {
+                    if (!seenFaces.Add(face.Face)) continue;
+                    styles.Add(new FontStyleItem
+                    {
+                        Name = face.Face,
+                        Family = file == regular.file ? family : FileFamily(file, new[] { name, face.Legacy }),
+                        Weight = FontWeight.FromOpenTypeWeight(face.Weight),
+                        Style = face.Italic == 1 ? FontStyles.Italic : face.Italic == 2 ? FontStyles.Oblique : FontStyles.Normal,
+                        Stretch = FontStretch.FromOpenTypeStretch(face.Width),
+                        SourceFile = file
+                    });
+                }
+                styles = styles
+                    .OrderBy(s => s.Stretch.ToOpenTypeStretch() == 5 ? 0 : 1)
+                    .ThenBy(s => s.Stretch.ToOpenTypeStretch())
+                    .ThenBy(s => s.Weight.ToOpenTypeWeight())
+                    .ThenBy(s => s.Style == FontStyles.Normal ? 0 : 1)
+                    .ToList();
+                list.Add(new FontItem
+                {
+                    Key = "sys:" + name,
+                    Name = name,
+                    Family = family,
+                    Styles = styles,
+                    MainFile = regular.file,
+                    SystemFiles = faces.Select(x => x.file).Distinct(StringComparer.OrdinalIgnoreCase).ToList()
+                });
+            }
+            return list;
+        }
+
         public static List<FontItem> LoadSystem()
+        {
+            try
+            {
+                var fast = LoadSystemFast();
+                if (fast.Count >= 20) return fast;
+            }
+            catch { }
+            return LoadSystemSlow();
+        }
+
+        public static List<FontItem> LoadSystemSlow()
         {
             var list = new List<FontItem>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -592,6 +742,7 @@ namespace FontShelf.Services
         public static List<string> AllFiles(FontItem f)
         {
             if (f.FilePaths != null) return f.FilePaths.ToList();
+            if (f.SystemFiles != null && f.SystemFiles.Count > 0) return f.SystemFiles.ToList();
             var files = new List<string>();
             try
             {

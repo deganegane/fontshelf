@@ -23,6 +23,17 @@ namespace FontShelf.Services
         public List<AxisInfo> Axes { get; set; } = new List<AxisInfo>();
     }
 
+    /// <summary>Osnovni podaci o jednom licu fonta (čitano izravno iz datoteke, bez WPF-a).</summary>
+    public class FaceInfo
+    {
+        public string Family { get; set; }      // nameID 16 ili 1
+        public string Legacy { get; set; }      // nameID 1
+        public string Face { get; set; }        // nameID 17 ili 2
+        public int Weight { get; set; } = 400;
+        public int Italic { get; set; }         // 0 normal, 1 italic, 2 oblique
+        public int Width { get; set; } = 5;
+    }
+
     /// <summary>Minimalni čitač OpenType tablica (GSUB/GPOS značajke, fvar osi, name).</summary>
     public static class OpenTypeReader
     {
@@ -70,6 +81,50 @@ namespace FontShelf.Services
                 d[tag] = (off, len);
             }
             return d;
+        }
+
+        /// <summary>Brzo čita imena i stil svih lica u datoteci (za popis instaliranih fontova).</summary>
+        public static List<FaceInfo> ReadFaces(string file)
+        {
+            var result = new List<FaceInfo>();
+            try
+            {
+                using var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096);
+                var r = new BE(fs);
+                foreach (var face in FaceOffsets(r))
+                {
+                    var t = Tables(r, face);
+                    if (!t.TryGetValue("name", out var nt)) continue;
+                    var names = ReadNames(r, nt.off, new HashSet<ushort> { 1, 2, 16, 17 });
+                    names.TryGetValue(1, out var n1);
+                    names.TryGetValue(2, out var n2);
+                    names.TryGetValue(16, out var n16);
+                    names.TryGetValue(17, out var n17);
+                    var fi = new FaceInfo
+                    {
+                        Family = (string.IsNullOrWhiteSpace(n16) ? n1 : n16)?.Trim(),
+                        Legacy = n1?.Trim(),
+                        Face = (string.IsNullOrWhiteSpace(n17) ? n2 : n17)?.Trim()
+                    };
+                    if (string.IsNullOrWhiteSpace(fi.Family)) continue;
+                    if (t.TryGetValue("OS/2", out var os2) && os2.len >= 64)
+                    {
+                        r.Pos = os2.off + 4;
+                        int w = r.U16();
+                        int wd = r.U16();
+                        r.Pos = os2.off + 62;
+                        int sel = r.U16();
+                        if (w > 0 && w < 10) w *= 100;
+                        fi.Weight = Math.Max(1, Math.Min(999, w == 0 ? 400 : w));
+                        fi.Width = wd >= 1 && wd <= 9 ? wd : 5;
+                        fi.Italic = (sel & 1) != 0 ? 1 : (sel & 0x200) != 0 ? 2 : 0;
+                    }
+                    if (string.IsNullOrWhiteSpace(fi.Face)) fi.Face = "Regular";
+                    result.Add(fi);
+                }
+            }
+            catch { }
+            return result;
         }
 
         public static bool HasVariations(string file)
