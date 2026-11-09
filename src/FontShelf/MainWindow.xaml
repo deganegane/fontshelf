@@ -391,8 +391,11 @@
 
                     <TextBlock Text="O aplikaciji" Style="{StaticResource DetailTitle}" Margin="0,20,0,6"/>
                     <DockPanel>
-                        <Button DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Margin="0" Content="Nove verzije"
-                                ToolTip="Otvori stranicu s izdanjima na GitHubu" Click="OpenReleases_Click"/>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource ActionButton}" Margin="0" Content="Provjeri"
+                                ToolTip="Provjeri ima li nova verzija" Click="CheckUpdates_Click"/>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Margin="0,0,4,0" Content="Izdanja"
+                                Foreground="{DynamicResource SubTextBrush}" ToolTip="Otvori stranicu s izdanjima na GitHubu"
+                                Click="OpenReleases_Click"/>
                         <TextBlock VerticalAlignment="Center">
                             <Run Text="FontShelf "/><Run Text="{Binding AppVersion, Mode=OneWay}" FontWeight="SemiBold"/>
                         </TextBlock>
@@ -1298,6 +1301,21 @@
                             </Grid>
                         </Grid>
                     </Grid>
+                </Border>
+
+                <!-- Nova verzija -->
+                <Border Grid.ColumnSpan="3" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,14,0,0"
+                        Background="{DynamicResource PopupBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
+                        CornerRadius="12" Padding="16,8,8,8" Effect="{StaticResource PopupShadow}" MaxWidth="760"
+                        Visibility="{Binding UpdateAvailable, Converter={StaticResource BoolVis}}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE896;" FontFamily="{StaticResource IconFont}" FontSize="14" Foreground="{DynamicResource AccentBrush}"
+                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="{Binding UpdateText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="420"/>
+                        <Button Style="{StaticResource AccentButton}" Margin="14,0,4,0" Content="{Binding UpdateButtonText}"
+                                Click="InstallUpdate_Click"/>
+                        <Button Style="{StaticResource IconButton}" Content="&#xE711;" ToolTip="Kasnije" Click="DismissUpdate_Click"/>
+                    </StackPanel>
                 </Border>
 
                 <!-- Obavijest (toast) -->

@@ -28,6 +28,7 @@ namespace FontShelf
     {
         private readonly MainViewModel _vm = new MainViewModel();
         private bool _syncing;
+        private bool _exiting;
 
         private readonly DispatcherTimer _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3.5) };
 
@@ -54,6 +55,12 @@ namespace FontShelf
             };
             SystemEvents.UserPreferenceChanged += OnSystemPreferenceChanged;
             _vm.RequestSelectAll += SelectAllEntry;
+            Updater.CleanupOld();
+            _vm.RequestExit += () =>
+            {
+                _exiting = true;
+                Close();
+            };
             _vm.ThemeChanged += () =>
             {
                 ApplyTitleBar();
@@ -107,7 +114,7 @@ namespace FontShelf
         private void Window_Closing(object sender, CancelEventArgs e)
         {
             SystemEvents.UserPreferenceChanged -= OnSystemPreferenceChanged;
-            _vm.OnClosing();
+            if (!_exiting) _vm.OnClosing();
         }
 
         #region Prozor i naslovna traka
@@ -192,6 +199,12 @@ namespace FontShelf
             => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
+
+        private async void CheckUpdates_Click(object sender, RoutedEventArgs e) => await _vm.CheckForUpdatesAsync(true);
+
+        private async void InstallUpdate_Click(object sender, RoutedEventArgs e) => await _vm.InstallUpdateAsync();
+
+        private void DismissUpdate_Click(object sender, RoutedEventArgs e) => _vm.UpdateAvailable = false;
 
         private void OpenReleases_Click(object sender, RoutedEventArgs e)
         {

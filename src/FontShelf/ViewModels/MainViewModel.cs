@@ -566,6 +566,7 @@ namespace FontShelf.ViewModels
             catch { }
             ScheduleSave();
             _ = EnsureGoogleAsync();
+            _ = CheckForUpdatesAsync(false);
         }
 
         private void AddUnique(IEnumerable<FontItem> items)
@@ -1121,6 +1122,69 @@ namespace FontShelf.ViewModels
 
         #endregion
 
+
+        #region Ažuriranje
+
+        private Updater.UpdateInfo _update;
+        public event Action RequestExit;
+
+        private bool _updateAvailable;
+        public bool UpdateAvailable { get => _updateAvailable; set => Set(ref _updateAvailable, value); }
+
+        private string _updateText = "";
+        public string UpdateText { get => _updateText; private set => Set(ref _updateText, value); }
+
+        private bool _updating;
+        public bool Updating { get => _updating; private set { if (Set(ref _updating, value)) OnPropertyChanged(nameof(UpdateButtonText)); } }
+
+        private string _updateProgress = "";
+        public string UpdateButtonText => Updating ? (_updateProgress == "" ? "Preuzimam…" : _updateProgress) : "Ažuriraj i ponovno pokreni";
+
+        public async Task CheckForUpdatesAsync(bool manual)
+        {
+            try
+            {
+                var info = await Updater.CheckAsync();
+                if (info == null)
+                {
+                    if (manual) StatusText = $"Imaš najnoviju verziju (build {Updater.CurrentBuild}).";
+                    return;
+                }
+                _update = info;
+                UpdateText = $"Dostupna je nova verzija: build {info.Build}" +
+                             (string.IsNullOrWhiteSpace(info.Notes) ? "" : $" — {info.Notes.Split('\n')[0].Trim()}");
+                UpdateAvailable = true;
+            }
+            catch (Exception ex)
+            {
+                if (manual) StatusText = "Provjera nove verzije nije uspjela: " + ex.Message;
+            }
+        }
+
+        public async Task InstallUpdateAsync()
+        {
+            if (_update == null || Updating) return;
+            Updating = true;
+            try
+            {
+                OnClosing(); // spremi biblioteku prije pokretanja nove verzije
+                var progress = new Progress<double>(p =>
+                {
+                    _updateProgress = $"Preuzimam… {p * 100:0}%";
+                    OnPropertyChanged(nameof(UpdateButtonText));
+                });
+                await Updater.InstallAsync(_update, progress);
+                RequestExit?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                StatusText = "Ažuriranje nije uspjelo: " + ex.Message;
+                _updateProgress = "";
+                Updating = false;
+            }
+        }
+
+        #endregion
 
         #region Napredni filteri
 
