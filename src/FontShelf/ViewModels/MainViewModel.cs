@@ -135,6 +135,7 @@ namespace FontShelf.ViewModels
                 {
                     OnPropertyChanged(nameof(EffectivePreviewText));
                     OnPropertyChanged(nameof(CardText));
+                    OnPropertyChanged(nameof(GridText));
                     _lib.PreviewText = _previewText;
                     ScheduleSave();
                 }
@@ -157,6 +158,8 @@ namespace FontShelf.ViewModels
                     OnPropertyChanged(nameof(CardMaxHeight));
                     OnPropertyChanged(nameof(OverlaySize));
                     OnPropertyChanged(nameof(GooglePreviewSize));
+                    OnPropertyChanged(nameof(GridFontSize));
+                    UpdateGridLayout();
                     _lib.PreviewSize = v;
                     ScheduleSave();
                 }
@@ -404,9 +407,28 @@ namespace FontShelf.ViewModels
         public List<List<FontItem>> GridRows { get => _gridRows; private set => Set(ref _gridRows, value); }
         private int _gridColumns = 4;
 
+        private double _gridWidth = 900;
+        private double _tileWidth = 214;
+        public double GridTileWidth { get => _tileWidth; private set => Set(ref _tileWidth, value); }
+        public double GridTileHeight => Math.Round(Math.Max(150, GridFontSize * 1.4 + 90));
+
+        public string GridText => string.IsNullOrWhiteSpace(PreviewText) ? "Aa" : PreviewText;
+        public double GridFontSize => Math.Max(20, Math.Min(120, PreviewSize));
+
         public void SetGridWidth(double width)
         {
-            int cols = Math.Max(1, (int)((width - 14) / 212));
+            _gridWidth = width;
+            UpdateGridLayout();
+        }
+
+        private void UpdateGridLayout()
+        {
+            const double gap = 14;
+            double avail = Math.Max(200, _gridWidth - 12);
+            double minTile = Math.Max(200, GridFontSize * 3.4);
+            int cols = Math.Max(1, (int)((avail + gap) / (minTile + gap)));
+            GridTileWidth = Math.Floor((avail + gap) / cols - gap);
+            OnPropertyChanged(nameof(GridTileHeight));
             if (cols != _gridColumns)
             {
                 _gridColumns = cols;

@@ -48,7 +48,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Width="214" Height="172" Margin="0,0,14,14" CornerRadius="12"
+                        <Border x:Name="Bd" Width="{Binding DataContext.GridTileWidth, RelativeSource={RelativeSource AncestorType=Window}}" Height="{Binding DataContext.GridTileHeight, RelativeSource={RelativeSource AncestorType=Window}}" Margin="0,0,14,14" CornerRadius="12"
                                 Background="{DynamicResource CardBrush}" BorderThickness="1.5" BorderBrush="Transparent">
                             <ContentPresenter/>
                         </Border>
@@ -698,8 +698,10 @@
                                                             <RowDefinition Height="*"/>
                                                             <RowDefinition Height="Auto"/>
                                                         </Grid.RowDefinitions>
-                                                        <TextBlock Text="Aa" FontFamily="{Binding Family}" FontSize="58"
-                                                                   HorizontalAlignment="Left" VerticalAlignment="Center" Margin="20,8,0,0"/>
+                                                        <TextBlock Text="{Binding DataContext.GridText, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                   FontSize="{Binding DataContext.GridFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                   FontFamily="{Binding Family}" TextTrimming="CharacterEllipsis"
+                                                                   HorizontalAlignment="Left" VerticalAlignment="Center" Margin="20,8,16,0"/>
                                                         <StackPanel x:Name="TileActs" Orientation="Horizontal" HorizontalAlignment="Right"
                                                                     VerticalAlignment="Top" Margin="0,6,6,0">
                                                             <ToggleButton Style="{StaticResource IconToggle}" Content="&#xE8A9;"
