@@ -40,7 +40,7 @@ namespace FontShelf
             InitializeComponent();
             WindowChrome.SetWindowChrome(this, new WindowChrome
             {
-                CaptionHeight = 48,
+                CaptionHeight = 62,
                 ResizeBorderThickness = new Thickness(6),
                 GlassFrameThickness = ThemeManager.UseMica ? new Thickness(-1) : new Thickness(0),
                 CornerRadius = new CornerRadius(8),
@@ -235,6 +235,11 @@ namespace FontShelf
                 SearchBox.SelectAll();
                 e.Handled = true;
             }
+            else if (e.Key == Key.I && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                _vm.ShowInspector = !_vm.ShowInspector;
+                e.Handled = true;
+            }
             else if (e.Key == Key.Escape && SearchBox.IsKeyboardFocusWithin)
             {
                 _vm.SearchText = "";
@@ -405,6 +410,48 @@ namespace FontShelf
 
         private void Sort_Click(object sender, RoutedEventArgs e) => _vm.CycleSort();
 
+        private void ViewMenu_Click(object sender, RoutedEventArgs e)
+        {
+            if (!(sender is Button b)) return;
+            var menu = b.ContextMenu ?? new ContextMenu();
+            menu.Items.Clear();
+
+            MenuItem Item(string text, bool on, Action act)
+            {
+                var mi = new MenuItem { Header = text, Tag = on ? "\uE73E" : "" };
+                mi.Click += (s2, e2) => act();
+                return mi;
+            }
+
+            menu.Items.Add(Item("Redak", _vm.IsLinePreview, () => _vm.IsLinePreview = true));
+            menu.Items.Add(Item("Odlomak", _vm.IsParagraphPreview, () => _vm.IsParagraphPreview = true));
+            menu.Items.Add(Item("Abeceda", _vm.IsAlphabetPreview, () => _vm.IsAlphabetPreview = true));
+            menu.Items.Add(new Separator { Margin = new Thickness(8, 4, 8, 4), Background = (System.Windows.Media.Brush)FindResource("LineBrush") });
+            foreach (SortMode m in Enum.GetValues(typeof(SortMode)))
+            {
+                var mode = m;
+                var label = mode switch
+                {
+                    SortMode.NameDesc => "Ime Ž–A",
+                    SortMode.Styles => "Najviše stilova",
+                    SortMode.Recent => "Nedavno dodani",
+                    SortMode.FavoritesFirst => "Favoriti prvi",
+                    _ => "Ime A–Ž"
+                };
+                menu.Items.Add(Item(label, _vm.Sort == mode, () => _vm.Sort = mode));
+            }
+            menu.PlacementTarget = b;
+            menu.Placement = PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }
+
+        private void ShowAddTag_Click(object sender, RoutedEventArgs e)
+        {
+            AddTagPanel.Visibility = Visibility.Visible;
+            AddTagLink.Visibility = Visibility.Collapsed;
+            AddTagBox.Focus();
+        }
+
         private void ResetFilters_Click(object sender, RoutedEventArgs e) => _vm.ResetFilters();
 
         private void ResetRange_Click(object sender, RoutedEventArgs e)
@@ -550,6 +597,8 @@ namespace FontShelf
             if (e.Key != Key.Enter) return;
             _vm.AddTagToFont(_vm.SelectedFont, AddTagBox.Text);
             AddTagBox.Text = "";
+            AddTagPanel.Visibility = Visibility.Collapsed;
+            AddTagLink.Visibility = Visibility.Visible;
             e.Handled = true;
         }
 

@@ -42,36 +42,36 @@ namespace FontShelf.Services
             if (UseMica)
             {
                 S(r, "WindowBgBrush", "#00000000");
-                S(r, "LayerBrush", light ? "#E6FBFBFD" : "#D9222227");
+                S(r, "LayerBrush", light ? "#E6FBFBFD" : "#D9212228");
             }
         }
 
         private static readonly Dictionary<string, string> Dark = new Dictionary<string, string>
         {
-            ["WindowBgBrush"] = "#1A1A1E",
-            ["LayerBrush"] = "#222227",
-            ["BgBrush"] = "#222227",
-            ["PanelBrush"] = "#222227",
-            ["CardBrush"] = "#2A2A30",
-            ["CardHoverBrush"] = "#2E2E35",
+            ["WindowBgBrush"] = "#18181D",
+            ["LayerBrush"] = "#212228",
+            ["BgBrush"] = "#212228",
+            ["PanelBrush"] = "#212228",
+            ["CardBrush"] = "#2B2C34",
+            ["CardHoverBrush"] = "#30313A",
             ["RowHoverBrush"] = "#0DFFFFFF",
-            ["LineBrush"] = "#313137",
-            ["InputBrush"] = "#2A2A30",
+            ["LineBrush"] = "#2E2F37",
+            ["InputBrush"] = "#2B2C34",
             ["TextBrush"] = "#EDEDF0",
-            ["SubTextBrush"] = "#8D9099",
+            ["SubTextBrush"] = "#9A9DA6",
             ["BodyTextBrush"] = "#C4C5CC",
-            ["AccentBrush"] = "#7C8BFF",
-            ["AccentSoftBrush"] = "#2A7C8BFF",
+            ["AccentBrush"] = "#8C99FF",
+            ["AccentSoftBrush"] = "#268C99FF",
             ["OnAccentBrush"] = "#101114",
             ["StarBrush"] = "#FFC857",
             ["WarnBrush"] = "#FF9F6B",
             ["GoodBrush"] = "#5FD38F",
-            ["ControlBrush"] = "#303037",
-            ["SegmentOnBrush"] = "#3D3D46",
+            ["ControlBrush"] = "#2D2E36",
+            ["SegmentOnBrush"] = "#3E3F49",
             ["SelectedNavBrush"] = "#14FFFFFF",
             ["HoverBrush"] = "#FFFFFF",
             ["ThumbBrush"] = "#40FFFFFF",
-            ["PopupBrush"] = "#2B2B31",
+            ["PopupBrush"] = "#2B2C34",
             ["ToastBrush"] = "#F2303037",
             ["OverlayABrush"] = "#FF6B8B",
             ["OverlayBBrush"] = "#4FD1C5",

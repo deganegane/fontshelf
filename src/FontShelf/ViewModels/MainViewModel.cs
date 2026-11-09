@@ -154,6 +154,7 @@ namespace FontShelf.ViewModels
                 {
                     OnPropertyChanged(nameof(PreviewSizeText));
                     OnPropertyChanged(nameof(CardFontSize));
+                    OnPropertyChanged(nameof(CardMaxHeight));
                     OnPropertyChanged(nameof(OverlaySize));
                     OnPropertyChanged(nameof(GooglePreviewSize));
                     _lib.PreviewSize = v;
@@ -257,6 +258,28 @@ namespace FontShelf.ViewModels
         public bool IsGoogleMode => SelectedEntry?.Kind == SidebarKind.Google;
         public bool IsLibraryMode => !IsGoogleMode;
         public bool FilterPanelVisible => ShowFilters && !IsGoogleMode;
+
+        public bool ShowInspector
+        {
+            get => _lib.ShowInspector;
+            set
+            {
+                if (_lib.ShowInspector == value) return;
+                _lib.ShowInspector = value;
+                OnPropertyChanged();
+                ScheduleSave();
+            }
+        }
+
+        public string PreviewDisplayText => (Preview switch
+        {
+            PreviewMode.Paragraph => "Odlomak",
+            PreviewMode.Alphabet => "Abeceda",
+            _ => "Redak"
+        }) + " · " + SortText;
+
+        public double CardMaxHeight => Preview == PreviewMode.Line ? double.PositiveInfinity : Math.Ceiling(CardFontSize * 1.45 * 2 + 4);
+        public double CardMaxWidth => Preview == PreviewMode.Paragraph ? 1000 : double.PositiveInfinity;
         public bool ShowList => !IsGoogleMode && View == ViewMode.List;
         public bool ShowGrid => !IsGoogleMode && View == ViewMode.Grid;
         public bool ShowTable => !IsGoogleMode && View == ViewMode.Table;
@@ -271,7 +294,8 @@ namespace FontShelf.ViewModels
                 if (_lib.Preview == value) return;
                 _lib.Preview = value;
                 foreach (var p in new[] { nameof(Preview), nameof(IsLinePreview), nameof(IsParagraphPreview), nameof(IsAlphabetPreview),
-                             nameof(CardText), nameof(CardFontSize), nameof(CardWrap) })
+                             nameof(CardText), nameof(CardFontSize), nameof(CardWrap), nameof(PreviewDisplayText),
+                             nameof(CardMaxHeight), nameof(CardMaxWidth) })
                     OnPropertyChanged(p);
                 ScheduleSave();
             }
@@ -303,6 +327,7 @@ namespace FontShelf.ViewModels
                 _lib.Sort = value;
                 OnPropertyChanged(nameof(Sort));
                 OnPropertyChanged(nameof(SortText));
+                OnPropertyChanged(nameof(PreviewDisplayText));
                 ApplySort();
                 ScheduleSave();
             }
@@ -503,7 +528,7 @@ namespace FontShelf.ViewModels
             _previewSize = _lib.PreviewSize;
             foreach (var p in new[] { nameof(PreviewText), nameof(EffectivePreviewText), nameof(PreviewSize), nameof(PreviewSizeText),
                          nameof(CardText), nameof(CardFontSize), nameof(CardWrap), nameof(OverlaySize), nameof(HideSystemFonts),
-                         nameof(TemporaryActivation), nameof(IsThemeSystem), nameof(IsThemeLight), nameof(IsThemeDark), nameof(SortText), nameof(IsLinePreview),
+                         nameof(TemporaryActivation), nameof(ShowInspector), nameof(PreviewDisplayText), nameof(CardMaxHeight), nameof(CardMaxWidth), nameof(IsThemeSystem), nameof(IsThemeLight), nameof(IsThemeDark), nameof(SortText), nameof(IsLinePreview),
                          nameof(IsParagraphPreview), nameof(IsAlphabetPreview) })
                 OnPropertyChanged(p);
             if (View == ViewMode.Compare) _lib.View = ViewMode.List;

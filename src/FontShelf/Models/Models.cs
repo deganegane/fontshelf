@@ -267,6 +267,7 @@ namespace FontShelf.Models
         /// <summary>0 = prati Windows, 1 = svijetla, 2 = tamna</summary>
         public int ThemeMode { get; set; }
         public bool ShowFilters { get; set; }
+        public bool ShowInspector { get; set; } = true;
         public SortMode Sort { get; set; } = SortMode.NameAsc;
         public ViewMode View { get; set; } = ViewMode.List;
         public PreviewMode Preview { get; set; } = PreviewMode.Line;

@@ -185,7 +185,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <DockPanel Height="28">
+                <DockPanel Height="26">
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="0,-2,0,0">
                         <StackPanel x:Name="Acts" Orientation="Horizontal" Opacity="0">
                             <ToggleButton Style="{StaticResource ActivateToggle}" Content="&#xE945;"
@@ -206,7 +206,9 @@
                         <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource BadgesTemplate}" Margin="4,0,0,0"/>
                     </StackPanel>
                 </DockPanel>
-                <TextBlock Grid.Row="1" Margin="0,2,10,0"
+                <TextBlock Grid.Row="1" Margin="0,6,10,0" HorizontalAlignment="Left"
+                           MaxHeight="{Binding DataContext.CardMaxHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                           MaxWidth="{Binding DataContext.CardMaxWidth, RelativeSource={RelativeSource AncestorType=Window}}"
                            Text="{Binding DataContext.CardText, RelativeSource={RelativeSource AncestorType=Window}}"
                            FontSize="{Binding DataContext.CardFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
                            TextWrapping="{Binding DataContext.CardWrap, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -242,41 +244,31 @@
 
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
-            <RowDefinition Height="48"/>
+            <RowDefinition Height="68"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="236"/>
+            <ColumnDefinition Width="256"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
         <!-- ===================== NASLOVNA TRAKA ===================== -->
-        <StackPanel Orientation="Horizontal" Margin="18,0,0,0" VerticalAlignment="Center">
-            <Border Width="26" Height="26" CornerRadius="7" Background="{DynamicResource AccentBrush}">
-                <TextBlock Text="Aa" FontFamily="Georgia" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource OnAccentBrush}"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
-            </Border>
-            <TextBlock Text="FontShelf" FontFamily="{StaticResource DisplayFont}" FontSize="14" FontWeight="SemiBold"
-                       Margin="10,0,0,1" VerticalAlignment="Center"/>
+        <StackPanel Orientation="Horizontal" Margin="22,0,0,6" VerticalAlignment="Center">
+            <Image Source="Assets/logo.png" Width="28" Height="28" RenderOptions.BitmapScalingMode="HighQuality"/>
+            <TextBlock Text="FontShelf" FontFamily="{StaticResource DisplayFont}" FontSize="14.5" FontWeight="SemiBold"
+                       Margin="12,0,0,1" VerticalAlignment="Center"/>
         </StackPanel>
 
         <Grid Grid.Column="1">
-            <!-- Stupci prate raspored sloja ispod: [filteri] [glavni prikaz] [inspektor 410] -->
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="410"/>
-            </Grid.ColumnDefinitions>
-            <Border Width="286" Visibility="{Binding FilterPanelVisible, Converter={StaticResource BoolVis}}"/>
-            <Border Grid.Column="1" Height="36" CornerRadius="9" Background="{DynamicResource InputBrush}" HorizontalAlignment="Stretch"
-                    Margin="0,0,0,0" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+            <Border Width="520" Height="38" CornerRadius="10" Background="{DynamicResource InputBrush}" HorizontalAlignment="Center"
+                    Margin="0,0,0,6" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="&#xE721;" FontFamily="{StaticResource IconFont}" FontSize="12" Margin="12,0,4,0"
+                    <TextBlock Text="&#xE721;" FontFamily="{StaticResource IconFont}" FontSize="12" Margin="14,0,4,0"
                                Foreground="{DynamicResource SubTextBrush}" VerticalAlignment="Center"/>
                     <TextBox x:Name="SearchBox" Grid.Column="1" Style="{StaticResource BareTextBox}"
                              Tag="Pretraži fontove, tagove i dizajnere"
@@ -287,7 +279,7 @@
                     </Border>
                 </Grid>
             </Border>
-            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right"
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Height="44"
                         shell:WindowChrome.IsHitTestVisibleInChrome="True">
                 <Button Style="{StaticResource CaptionButton}" Content="&#xE921;" Click="Minimize_Click" ToolTip="Smanji"/>
                 <Button x:Name="MaxButton" Style="{StaticResource CaptionButton}" Content="&#xE922;" Click="Maximize_Click" ToolTip="Povećaj"/>
@@ -297,10 +289,10 @@
 
         <!-- ===================== BOČNA TRAKA ===================== -->
         <DockPanel Grid.Row="1">
-            <StackPanel DockPanel.Dock="Bottom" Margin="8,4,8,12">
+            <StackPanel DockPanel.Dock="Bottom" Margin="12,8,12,16">
                 <Button x:Name="SettingsButton" Style="{StaticResource GhostButton}" HorizontalContentAlignment="Left"
-                        HorizontalAlignment="Stretch" Padding="12,8" Click="Settings_Click">
-                    <Grid Width="196">
+                        HorizontalAlignment="Stretch" Padding="14,10" Click="Settings_Click">
+                    <Grid Width="204">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="28"/>
                             <ColumnDefinition Width="*"/>
@@ -312,7 +304,7 @@
                 </Button>
             </StackPanel>
 
-            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="8,0,8,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,0,12,0">
                 <StackPanel>
                     <ListBox x:Name="LibraryList" Style="{StaticResource PlainList}" Margin="0,4,0,0"
                              ItemsSource="{Binding LibraryEntries}" ItemTemplate="{StaticResource LibraryEntryTemplate}"
@@ -335,9 +327,6 @@
                              PreviewMouseWheel="Sidebar_PreviewMouseWheel"/>
                     <TextBox x:Name="NewTagBox" Tag="Ime taga, pa Enter" Margin="4,4,4,0" Padding="10,6"
                              KeyDown="NewTagBox_KeyDown" LostKeyboardFocus="NewTagBox_LostFocus" Visibility="Collapsed"/>
-                    <TextBlock Text="Označi fontove tagovima da ih grupiraš u kolekcije." TextWrapping="Wrap" FontSize="12"
-                               Foreground="{DynamicResource SubTextBrush}" Margin="12,0,8,0"
-                               Visibility="{Binding HasTags, Converter={StaticResource BoolVisInv}}"/>
 
                     <Grid>
                         <TextBlock Text="Mape" Style="{StaticResource SectionTitle}"/>
@@ -415,7 +404,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="410"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- ============ NAPREDNI FILTERI (FontBase stil) ============ -->
@@ -579,54 +568,65 @@
                     </Grid.RowDefinitions>
 
                     <!-- Zaglavlje -->
-                    <DockPanel Margin="32,24,24,0">
-                        <Border DockPanel.Dock="Right" Background="{DynamicResource ControlBrush}" CornerRadius="10" Padding="4"
-                                Height="40" VerticalAlignment="Center" Visibility="{Binding IsLibraryMode, Converter={StaticResource BoolVis}}">
-                            <StackPanel Orientation="Horizontal">
-                                <RadioButton Style="{StaticResource SegmentButton}" IsChecked="{Binding IsListMode}" ToolTip="Popis">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="&#xE8FD;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center"/>
-                                        <TextBlock Text="Popis" Margin="7,0,0,0"/>
-                                    </StackPanel>
-                                </RadioButton>
-                                <RadioButton Style="{StaticResource SegmentButton}" IsChecked="{Binding IsGridMode}" ToolTip="Mreža">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="&#xF0E2;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center"/>
-                                        <TextBlock Text="Mreža" Margin="7,0,0,0"/>
-                                    </StackPanel>
-                                </RadioButton>
-                                <RadioButton Style="{StaticResource SegmentButton}" Content="Tablica" IsChecked="{Binding IsTableMode}"/>
-                                <RadioButton Style="{StaticResource SegmentButton}" IsChecked="{Binding IsCompareMode}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="&#xE8A9;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding CompareTabText}" Margin="7,0,0,0"/>
-                                    </StackPanel>
-                                </RadioButton>
-                            </StackPanel>
-                        </Border>
-                        <ToggleButton DockPanel.Dock="Right" Style="{StaticResource PillToggle}" Margin="0,0,10,0" VerticalAlignment="Center"
-                                      Height="40" IsChecked="{Binding ShowFilters}" ToolTip="Napredni filteri (kontrast, debljina, širina, serifi…)"
+                    <DockPanel Margin="48,36,48,0" LastChildFill="True">
+                        <ToggleButton DockPanel.Dock="Right" Style="{StaticResource PillToggle}" Margin="10,0,0,0" Width="44" Height="44"
+                                      VerticalAlignment="Center" IsChecked="{Binding ShowInspector}" ToolTip="Desni panel (Ctrl+I)">
+                            <Path Data="M2.5,3.5 H13.5 V12.5 H2.5 Z M10,3.5 V12.5" Width="16" Height="16" Stretch="None" StrokeThickness="1.3"
+                                  StrokeLineJoin="Round" Stroke="{DynamicResource TextBrush}"/>
+                        </ToggleButton>
+                        <ToggleButton DockPanel.Dock="Right" Style="{StaticResource PillToggle}" Margin="10,0,0,0" Height="44"
+                                      VerticalAlignment="Center" IsChecked="{Binding ShowFilters}"
+                                      ToolTip="Napredni filteri (kontrast, debljina, širina, serifi…)"
                                       Visibility="{Binding IsLibraryMode, Converter={StaticResource BoolVis}}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE71C;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center"
-                                           Margin="0,0,7,0"/>
+                                           Margin="0,0,8,0"/>
                                 <TextBlock Text="{Binding FiltersButtonText}"/>
                             </StackPanel>
                         </ToggleButton>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="{Binding HeaderTitle}" FontFamily="{StaticResource DisplayFont}" FontSize="28"
+                        <Border DockPanel.Dock="Right" Background="{DynamicResource ControlBrush}" CornerRadius="12" Padding="4"
+                                Height="44" VerticalAlignment="Center" Visibility="{Binding IsLibraryMode, Converter={StaticResource BoolVis}}">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton Style="{StaticResource SegmentButton}" IsChecked="{Binding IsListMode}" ToolTip="Popis"
+                                             Width="42" Padding="0">
+                                    <Path Data="M5.5,4 H14 M5.5,8 H14 M5.5,12 H14 M2,4 H2.2 M2,8 H2.2 M2,12 H2.2" Width="16" Height="16" Stretch="None" StrokeThickness="1.3"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                                </RadioButton>
+                                <RadioButton Style="{StaticResource SegmentButton}" IsChecked="{Binding IsGridMode}" ToolTip="Mreža"
+                                             Width="42" Padding="0">
+                                    <Path Data="M2.5,2.5 H6.5 V6.5 H2.5 Z M9.5,2.5 H13.5 V6.5 H9.5 Z M2.5,9.5 H6.5 V13.5 H2.5 Z M9.5,9.5 H13.5 V13.5 H9.5 Z" Width="16" Height="16" Stretch="None" StrokeThickness="1.3"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                                </RadioButton>
+                                <RadioButton Style="{StaticResource SegmentButton}" IsChecked="{Binding IsTableMode}" ToolTip="Tablica s podacima"
+                                             Width="42" Padding="0">
+                                    <Path Data="M2,3.5 H14 V12.5 H2 Z M2,6.5 H14 M6,6.5 V12.5" Width="16" Height="16" Stretch="None" StrokeThickness="1.3"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                                </RadioButton>
+                                <RadioButton Style="{StaticResource SegmentButton}" IsChecked="{Binding IsCompareMode}" ToolTip="{Binding CompareTabText}"
+                                             Width="42" Padding="0">
+                                    <Path Data="M2,3 H7 V13 H2 Z M9,3 H14 V13 H9 Z" Width="16" Height="16" Stretch="None" StrokeThickness="1.3"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
+                                </RadioButton>
+                            </StackPanel>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="{Binding HeaderTitle}" FontFamily="{StaticResource DisplayFont}" FontSize="30"
                                        FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Text="{Binding CountText}" Foreground="{DynamicResource SubTextBrush}" FontSize="12.5" Margin="1,0,0,0"/>
+                            <TextBlock Text="{Binding CountText}" Foreground="{DynamicResource SubTextBrush}" FontSize="13" Margin="1,2,0,0"/>
                         </StackPanel>
                     </DockPanel>
 
                     <!-- Traka za pregled (FontBase stil) -->
-                    <Grid Grid.Row="1" Margin="32,18,24,14">
+                    <Grid Grid.Row="1" Margin="48,28,48,20">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <Border Height="40" CornerRadius="10" Background="{DynamicResource InputBrush}">
+                        <Border Height="48" CornerRadius="12" Background="{DynamicResource InputBrush}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -634,12 +634,12 @@
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="&#xE70F;" FontFamily="{StaticResource IconFont}" FontSize="13" Margin="14,0,4,0"
+                                <TextBlock Text="&#xE70F;" FontFamily="{StaticResource IconFont}" FontSize="13" Margin="18,0,6,0"
                                            Foreground="{DynamicResource SubTextBrush}" VerticalAlignment="Center"/>
                                 <TextBox Grid.Column="1" Style="{StaticResource BareTextBox}" Tag="Upiši svoj tekst za pregled…"
-                                         FontSize="13.5" Text="{Binding PreviewText, UpdateSourceTrigger=PropertyChanged}"/>
+                                         FontSize="14" Text="{Binding PreviewText, UpdateSourceTrigger=PropertyChanged}"/>
                                 <Border Grid.Column="2" Width="1" Margin="8,10" Background="{DynamicResource LineBrush}"/>
-                                <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="4,0,14,0" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="6,0,18,0" VerticalAlignment="Center">
                                     <TextBlock Text="&#xE8E9;" FontFamily="{StaticResource IconFont}" FontSize="12"
                                                Foreground="{DynamicResource SubTextBrush}" VerticalAlignment="Center"/>
                                     <Slider Width="140" Minimum="10" Maximum="160" Margin="10,0" VerticalAlignment="Center"
@@ -649,29 +649,22 @@
                                 </StackPanel>
                             </Grid>
                         </Border>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="10,0,0,0" Height="40"
-                                    Visibility="{Binding IsLibraryMode, Converter={StaticResource BoolVis}}">
-                            <Border Background="{DynamicResource ControlBrush}" CornerRadius="10" Padding="4">
-                                <StackPanel Orientation="Horizontal">
-                                    <RadioButton Style="{StaticResource SegmentButton}" Content="Redak" IsChecked="{Binding IsLinePreview}"/>
-                                    <RadioButton Style="{StaticResource SegmentButton}" Content="Odlomak" IsChecked="{Binding IsParagraphPreview}"/>
-                                    <RadioButton Style="{StaticResource SegmentButton}" Content="Abeceda" IsChecked="{Binding IsAlphabetPreview}"/>
-                                </StackPanel>
-                            </Border>
-                            <Button Style="{StaticResource GhostButton}" Click="Sort_Click" Margin="10,0,0,0" Padding="14,0"
-                                    Background="{DynamicResource ControlBrush}"
-                                    ToolTip="Klikni za promjenu redoslijeda" Foreground="{DynamicResource TextBrush}">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE8CB;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center"
-                                               Margin="0,0,8,0"/>
-                                    <TextBlock Text="{Binding SortText}"/>
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
+                        <Button Grid.Column="1" Style="{StaticResource GhostButton}" Margin="12,0,0,0" Padding="18,0" Height="48"
+                                Background="{DynamicResource ControlBrush}" Click="ViewMenu_Click"
+                                ToolTip="Vrsta pregleda i redoslijed" Visibility="{Binding IsLibraryMode, Converter={StaticResource BoolVis}}">
+                            <Button.ContextMenu>
+                                <ContextMenu/>
+                            </Button.ContextMenu>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding PreviewDisplayText}" VerticalAlignment="Center"/>
+                                <TextBlock Text="&#xE70D;" FontFamily="{StaticResource IconFont}" FontSize="10" Margin="10,1,0,0"
+                                           VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                            </StackPanel>
+                        </Button>
                     </Grid>
 
                     <!-- Popis fontova -->
-                    <ListBox x:Name="FontList" Grid.Row="2" Margin="12,0,0,0" Style="{StaticResource PlainList}"
+                    <ListBox x:Name="FontList" Grid.Row="2" Margin="24,0,24,0" Style="{StaticResource PlainList}"
                              Visibility="{Binding ShowList, Converter={StaticResource BoolVis}}"
                              ItemsSource="{Binding FontsView}" SelectedItem="{Binding SelectedFont}"
                              ItemTemplate="{StaticResource FontRowTemplate}"
@@ -682,7 +675,7 @@
                              ScrollViewer.CanContentScroll="True"/>
 
                     <!-- Mreža -->
-                    <Grid Grid.Row="2" x:Name="GridHost" Margin="32,0,0,0" SizeChanged="GridHost_SizeChanged"
+                    <Grid Grid.Row="2" x:Name="GridHost" Margin="48,4,24,0" SizeChanged="GridHost_SizeChanged"
                           Visibility="{Binding ShowGrid, Converter={StaticResource BoolVis}}">
                         <ListBox Style="{StaticResource PlainList}" ItemsSource="{Binding GridRows}"
                                  ItemContainerStyle="{StaticResource PlainRowItem}"
@@ -736,7 +729,7 @@
                     </Grid>
 
                     <!-- Tablica s metapodacima -->
-                    <DataGrid Grid.Row="2" Margin="24,0,16,10" ItemsSource="{Binding FontsView}" SelectedItem="{Binding SelectedFont}"
+                    <DataGrid Grid.Row="2" Margin="40,4,40,10" ItemsSource="{Binding FontsView}" SelectedItem="{Binding SelectedFont}"
                               Visibility="{Binding ShowTable, Converter={StaticResource BoolVis}}"
                               EnableRowVirtualization="True" EnableColumnVirtualization="True"
                               VirtualizingPanel.VirtualizationMode="Recycling">
@@ -794,7 +787,7 @@
                     </StackPanel>
 
                     <!-- Usporedba -->
-                    <Grid Grid.Row="2" Margin="32,0,24,0" Visibility="{Binding ShowCompare, Converter={StaticResource BoolVis}}">
+                    <Grid Grid.Row="2" Margin="48,4,48,0" Visibility="{Binding ShowCompare, Converter={StaticResource BoolVis}}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
@@ -991,13 +984,13 @@
                     </Grid>
 
                     <!-- Google Fonts -->
-                    <Grid Grid.Row="2" Margin="12,0,0,0" Visibility="{Binding IsGoogleMode, Converter={StaticResource BoolVis}}">
+                    <Grid Grid.Row="2" Margin="24,0,24,0" Visibility="{Binding IsGoogleMode, Converter={StaticResource BoolVis}}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <DockPanel Margin="20,0,24,12">
+                        <DockPanel Margin="24,0,24,16">
                             <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Foreground="{DynamicResource SubTextBrush}"
                                     Click="RefreshGoogle_Click">
                                 <StackPanel Orientation="Horizontal">
@@ -1017,7 +1010,7 @@
                                 </StackPanel>
                             </Border>
                         </DockPanel>
-                        <TextBlock Grid.Row="1" Text="{Binding GoogleStatus}" Foreground="{DynamicResource SubTextBrush}" Margin="20,0,24,10"
+                        <TextBlock Grid.Row="1" Text="{Binding GoogleStatus}" Foreground="{DynamicResource SubTextBrush}" Margin="24,0,24,10"
                                    TextWrapping="Wrap"/>
                         <ListBox Grid.Row="2" Style="{StaticResource PlainList}" ItemsSource="{Binding GoogleView}" SelectedItem="{Binding SelectedGoogle}"
                                  ItemContainerStyle="{StaticResource FontRowItem}"
@@ -1062,7 +1055,8 @@
                 </Grid>
 
                 <!-- ============ INSPEKTOR ============ -->
-                <Border Grid.Column="2" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1,0,0,0">
+                <Border Grid.Column="2" Width="364" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1,0,0,0"
+                        Visibility="{Binding ShowInspector, Converter={StaticResource BoolVis}}">
                     <Grid>
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="30"
                                     Visibility="{Binding SelectedFont, Converter={StaticResource NullVisInv}}">
@@ -1082,51 +1076,44 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <StackPanel Margin="26,24,26,0">
-                                <Border Height="148" CornerRadius="12" Background="{DynamicResource CardBrush}" ClipToBounds="True">
+                            <StackPanel Margin="32,36,32,0">
+                                <Border Height="168" CornerRadius="16" Background="{DynamicResource CardBrush}" ClipToBounds="True">
                                     <Grid>
-                                        <TextBlock Text="Aa" FontFamily="{Binding SelectedFont.Family}" FontSize="96"
+                                        <TextBlock Text="Aa" FontFamily="{Binding SelectedFont.Family}" FontSize="100"
                                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding SelectedFont.StyleCountText}" FontSize="11" Margin="12,10"
+                                        <TextBlock Text="{Binding SelectedFont.StyleCountText}" FontSize="11.5" Margin="14,12"
                                                    Foreground="{DynamicResource SubTextBrush}" HorizontalAlignment="Left" VerticalAlignment="Top"/>
                                     </Grid>
                                 </Border>
                                 <TextBlock Text="{Binding SelectedFont.Name}" FontFamily="{StaticResource DisplayFont}" FontSize="22"
-                                           FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,16,0,0"/>
-                                <TextBlock Text="{Binding SelectedFont.SourceLabel}" Foreground="{DynamicResource SubTextBrush}" FontSize="12"
-                                           TextTrimming="CharacterEllipsis" Margin="0,2,0,0" ToolTip="{Binding SelectedFont.SourceLabel}"/>
-                                <WrapPanel Margin="0,14,0,0">
-                                    <Button Style="{StaticResource AccentButton}"
+                                           FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,24,0,0"/>
+                                <TextBlock Text="{Binding SelectedFont.SourceLabel}" Foreground="{DynamicResource SubTextBrush}" FontSize="12.5"
+                                           TextTrimming="CharacterEllipsis" Margin="0,4,0,0" ToolTip="{Binding SelectedFont.SourceLabel}"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
+                                    <Button Style="{StaticResource AccentButton}" Height="40" Margin="0,0,8,0" Padding="16,0"
                                             Visibility="{Binding SelectedFont.IsFromFolder, Converter={StaticResource BoolVis}}"
                                             ToolTip="Učini font dostupnim u svim aplikacijama, bez instalacije" Click="Activate_Click">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="&#xE945;" FontFamily="{StaticResource IconFont}" FontSize="12"
-                                                       VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                                       VerticalAlignment="Center" Margin="0,0,8,0"/>
                                             <TextBlock Text="{Binding SelectedFont.ActivateText}"/>
                                         </StackPanel>
                                     </Button>
-                                    <ToggleButton Style="{StaticResource PillToggle}" IsChecked="{Binding SelectedFont.IsFavorite}"
-                                                  Click="DetailFavorite_Click" ToolTip="Favorit">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="&#xE734;" FontFamily="{StaticResource IconFont}" FontSize="12"
-                                                       VerticalAlignment="Center" Margin="0,0,7,0"/>
-                                            <TextBlock Text="Favorit"/>
-                                        </StackPanel>
+                                    <ToggleButton Style="{StaticResource PillToggle}" IsChecked="{Binding SelectedFont.IsFavorite}" Margin="0,0,8,0"
+                                                  Width="40" Height="40" Click="DetailFavorite_Click" ToolTip="Favorit">
+                                        <TextBlock Text="&#xE734;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
                                     </ToggleButton>
-                                    <ToggleButton Style="{StaticResource PillToggle}" IsChecked="{Binding SelectedFont.IsComparing}"
-                                                  Click="DetailCompare_Click">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="&#xE8A9;" FontFamily="{StaticResource IconFont}" FontSize="12"
-                                                       VerticalAlignment="Center" Margin="0,0,7,0"/>
-                                            <TextBlock Text="Usporedi"/>
-                                        </StackPanel>
+                                    <ToggleButton Style="{StaticResource PillToggle}" IsChecked="{Binding SelectedFont.IsComparing}" Margin="0,0,8,0"
+                                                  Width="40" Height="40" Click="DetailCompare_Click" ToolTip="Dodaj u usporedbu">
+                                        <TextBlock Text="&#xE8A9;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
                                     </ToggleButton>
                                     <Button Style="{StaticResource ActionButton}" Content="&#xE712;" FontFamily="{StaticResource IconFont}"
-                                            Padding="10,8" ToolTip="Više" Click="More_Click" ContextMenu="{StaticResource MoreMenu}"/>
-                                </WrapPanel>
+                                            Width="40" Height="40" Padding="0" Margin="0" ToolTip="Više" Click="More_Click"
+                                            ContextMenu="{StaticResource MoreMenu}"/>
+                                </StackPanel>
                             </StackPanel>
 
-                            <Grid Grid.Row="1" Margin="26,8,26,0">
+                            <Grid Grid.Row="1" Margin="32,28,32,0">
                                 <Border Height="1" VerticalAlignment="Bottom" Background="{DynamicResource LineBrush}"/>
                                 <StackPanel Orientation="Horizontal">
                                     <RadioButton Style="{StaticResource TabButton}" Content="Pregled" IsChecked="{Binding ShowDetails}"/>
@@ -1139,8 +1126,8 @@
                             <!-- Pregled -->
                             <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
                                           Visibility="{Binding ShowDetails, Converter={StaticResource BoolVis}}">
-                                <StackPanel Margin="26,4,22,28">
-                                    <TextBlock Text="Tagovi" Style="{StaticResource DetailTitle}" Margin="0,18,0,10"/>
+                                <StackPanel Margin="32,0,28,32">
+                                    <TextBlock Text="Tagovi" Style="{StaticResource DetailTitle}" Margin="0,28,0,12"/>
                                     <ItemsControl ItemsSource="{Binding SelectedFont.Tags}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
@@ -1163,8 +1150,11 @@
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
-                                    <TextBox x:Name="AddTagBox" Tag="+ Dodaj tag i pritisni Enter" KeyDown="AddTagBox_KeyDown"
-                                             Margin="0,2,0,0"/>
+                                    <Button x:Name="AddTagLink" Style="{StaticResource GhostButton}" HorizontalAlignment="Left" Padding="8,4"
+                                            Margin="-8,0,0,0" Foreground="{DynamicResource AccentBrush}" Content="+ Tag" Click="ShowAddTag_Click"/>
+                                    <StackPanel x:Name="AddTagPanel" Visibility="Collapsed">
+                                    <TextBox x:Name="AddTagBox" Tag="Ime taga, pa Enter" KeyDown="AddTagBox_KeyDown"
+                                             Margin="0,4,0,0"/>
                                     <ItemsControl ItemsSource="{Binding SuggestedTags}" Margin="0,8,0,0">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
@@ -1184,6 +1174,8 @@
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
+
+                                    </StackPanel>
 
                                     <TextBlock Text="Informacije" Style="{StaticResource DetailTitle}"/>
                                     <Border Background="{DynamicResource CardBrush}" CornerRadius="10" Padding="16,10">
@@ -1250,7 +1242,7 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
-                                <Border Margin="26,16,26,0" Background="{DynamicResource CardBrush}" CornerRadius="12" Padding="16"
+                                <Border Margin="32,24,32,0" Background="{DynamicResource CardBrush}" CornerRadius="14" Padding="16"
                                         Visibility="{Binding SelectedGlyph, Converter={StaticResource NullVis}}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -1275,13 +1267,13 @@
                                         </StackPanel>
                                     </Grid>
                                 </Border>
-                                <DockPanel Grid.Row="1" Margin="26,12,26,8">
+                                <DockPanel Grid.Row="1" Margin="32,16,32,10">
                                     <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Padding="8,4"
                                             Foreground="{DynamicResource SubTextBrush}" Content="Kopiraj sve" Click="CopyAllGlyphs_Click"/>
                                     <TextBlock Text="{Binding GlyphInfo}" Foreground="{DynamicResource SubTextBrush}" FontSize="12"
                                                VerticalAlignment="Center"/>
                                 </DockPanel>
-                                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="26,0,14,16">
+                                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="32,0,20,20">
                                     <ItemsControl ItemsSource="{Binding Glyphs}" FontFamily="{Binding SelectedFont.Family}">
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
