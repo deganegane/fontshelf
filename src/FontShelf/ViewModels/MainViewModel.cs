@@ -601,9 +601,35 @@ namespace FontShelf.ViewModels
             foreach (var f in _all) f.IsDuplicate = counts[f.Name] > 1;
         }
 
+        private Dictionary<string, AnalysisCache.Entry> _analysisCache;
+
         private async Task AnalyzeAsync(List<FontItem> items)
         {
-            var results = await Task.Run(() => items.Select(f => (f, r: FontAnalyzer.Analyze(f))).ToList());
+            var results = await Task.Run(() =>
+            {
+                _analysisCache ??= AnalysisCache.Load();
+                bool dirty = false;
+                var list = new List<(FontItem f, AnalysisResult r)>(items.Count);
+                foreach (var f in items)
+                {
+                    var stamp = AnalysisCache.StampOf(f);
+                    AnalysisResult r;
+                    lock (_analysisCache)
+                    {
+                        if (_analysisCache.TryGetValue(f.Key, out var c) && c.Stamp == stamp && c.Result != null)
+                        {
+                            list.Add((f, c.Result));
+                            continue;
+                        }
+                    }
+                    r = FontAnalyzer.Analyze(f);
+                    lock (_analysisCache) _analysisCache[f.Key] = new AnalysisCache.Entry { Stamp = stamp, Result = r };
+                    dirty = true;
+                    list.Add((f, r));
+                }
+                if (dirty) lock (_analysisCache) AnalysisCache.Save(_analysisCache);
+                return list;
+            });
             foreach (var (f, r) in results)
             {
                 f.IsMono = r.Mono;

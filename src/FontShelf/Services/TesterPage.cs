@@ -82,7 +82,8 @@ namespace FontShelf.Services
 
             var cfg = new
             {
-                family = useLocalName ? "\"" + f.Name.Replace("\"", "") + "\"" : "\"" + fam + "\"",
+                family = useLocalName ? "\"" + f.Name.Replace("\"", "") + "\""
+                                      : "\"" + fam + "\", \"" + f.Name.Replace("\"", "") + "\"",
                 text,
                 size = Math.Round(size),
                 styles,

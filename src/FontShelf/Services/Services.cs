@@ -281,6 +281,65 @@ namespace FontShelf.Services
         public int Serif = -1;
     }
 
+    /// <summary>Spremljeni rezultati analize da se fontovi ne analiziraju pri svakom pokretanju.</summary>
+    public static class AnalysisCache
+    {
+        public class Entry
+        {
+            public string Stamp { get; set; }
+            public AnalysisResult Result { get; set; }
+        }
+
+        private const int Version = 2;
+        private static string FilePath => Path.Combine(AppPaths.Local, $"analysis-cache-v{Version}.json");
+
+        private static readonly JsonSerializerOptions Options = new JsonSerializerOptions
+        {
+            IncludeFields = true,
+            NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals
+        };
+
+        public static Dictionary<string, Entry> Load()
+        {
+            try
+            {
+                if (File.Exists(FilePath))
+                    return JsonSerializer.Deserialize<Dictionary<string, Entry>>(File.ReadAllText(FilePath), Options)
+                           ?? new Dictionary<string, Entry>();
+            }
+            catch { }
+            return new Dictionary<string, Entry>();
+        }
+
+        public static void Save(Dictionary<string, Entry> data)
+        {
+            try
+            {
+                Directory.CreateDirectory(AppPaths.Local);
+                var tmp = FilePath + ".tmp";
+                File.WriteAllText(tmp, JsonSerializer.Serialize(data, Options));
+                File.Move(tmp, FilePath, true);
+            }
+            catch { }
+        }
+
+        /// <summary>Oznaka verzije fonta – ako se promijeni, font se ponovno analizira.</summary>
+        public static string StampOf(FontItem f)
+        {
+            try
+            {
+                var file = f.FirstFile ?? f.MainFile;
+                if (file != null && File.Exists(file))
+                {
+                    var fi = new FileInfo(file);
+                    return $"{f.StyleCount}|{fi.Length}|{fi.LastWriteTimeUtc.Ticks}";
+                }
+            }
+            catch { }
+            return $"{f.StyleCount}";
+        }
+    }
+
     public static class FontAnalyzer
     {
         public const int MaxGlyphs = 1500;
@@ -615,7 +674,45 @@ namespace FontShelf.Services
 
     public static class GoogleFontsService
     {
-        private static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
+        private static readonly HttpClient Http = CreateClient();
+
+        // Google Fonts vraća TTF samo "starim" preglednicima; bez ovoga dobijemo WOFF/WOFF2 koje Windows ne može učitati
+        private const string TtfUserAgent =
+            "Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_8; de-at) AppleWebKit/533.21.1 (KHTML, like Gecko) Version/5.0.5 Safari/533.21.1";
+
+        private static HttpClient CreateClient()
+        {
+            var c = new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
+            c.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", TtfUserAgent);
+            return c;
+        }
+
+        /// <summary>Je li sadržaj stvarno TTF/OTF (a ne WOFF/WOFF2/HTML).</summary>
+        private static bool IsSfnt(byte[] b)
+        {
+            if (b == null || b.Length < 12) return false;
+            uint tag = (uint)(b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3]);
+            return tag == 0x00010000 || tag == 0x4F54544F /*OTTO*/ || tag == 0x74727565 /*true*/ || tag == 0x74746366 /*ttcf*/;
+        }
+
+        private static readonly Regex SrcRx = new Regex(@"url\((?<u>[^)]+)\)\s*format\(['""]?(?<f>[a-z0-9]+)['""]?\)", RegexOptions.Compiled);
+
+        private static string FindTtfUrl(string block)
+        {
+            foreach (Match m in SrcRx.Matches(block))
+            {
+                var f = m.Groups["f"].Value.ToLowerInvariant();
+                if (f == "truetype" || f == "opentype") return m.Groups["u"].Value.Trim('\'', '"', ' ');
+            }
+            // bez format() oznake: prihvati ako adresa završava s .ttf/.otf
+            foreach (Match m in UrlRx.Matches(block))
+            {
+                var u = m.Groups["u"].Value.Trim('\'', '"', ' ');
+                var path = u.Split('?')[0].ToLowerInvariant();
+                if (path.EndsWith(".ttf") || path.EndsWith(".otf")) return u;
+            }
+            return null;
+        }
 
         public static string Dir => Path.Combine(AppPaths.Local, "Google Fonts");
         private static string CachePath => Path.Combine(AppPaths.Local, "google-fonts-catalog.json");
@@ -688,19 +785,40 @@ namespace FontShelf.Services
             return list.OrderBy(e => e.Popularity).ToList();
         }
 
-        public static string PreviewDir => Path.Combine(AppPaths.Local, "GooglePreview");
+        public static string PreviewDir => Path.Combine(AppPaths.Local, "GooglePreviews");
 
         private const string PreviewChars =
             "ABCČĆDĐEFGHIJKLMNOPQRSŠTUVWXYZŽabcčćdđefghijklmnopqrsštuvwxyzž0123456789 .,:;!?'\"-–—()&@€$%/+*#„“”’";
 
+        /// <summary>Učita font iz datoteke tako da ga WPF sigurno pronađe (svaki font u svojoj mapi).</summary>
+        public static FontFamily LoadFamilyFromFile(string path)
+        {
+            try
+            {
+                var gt = new GlyphTypeface(new Uri(path));
+                var name = gt.FamilyNames.Values.FirstOrDefault() ?? gt.Win32FamilyNames.Values.FirstOrDefault();
+                var dir = Path.GetDirectoryName(path).TrimEnd('\\') + "\\";
+                if (!string.IsNullOrEmpty(name))
+                {
+                    var fam = new FontFamily(new Uri(dir), "./#" + name);
+                    if (fam.GetTypefaces().Any(t => t.TryGetGlyphTypeface(out _))) return fam;
+                }
+                var any = Fonts.GetFontFamilies(new Uri(path)).FirstOrDefault();
+                if (any != null && any.GetTypefaces().Any(t => t.TryGetGlyphTypeface(out _))) return any;
+            }
+            catch { }
+            return null;
+        }
+
         /// <summary>Preuzme mali podskup fonta (samo potrebni znakovi) za pregled prije preuzimanja.</summary>
         public static async Task<FontFamily> GetPreviewFamilyAsync(GoogleFontEntry e, string extraText)
         {
-            Directory.CreateDirectory(PreviewDir);
             var safe = new string(e.Family.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c).ToArray());
-            var path = Path.Combine(PreviewDir, safe + ".ttf");
+            var dir = Path.Combine(PreviewDir, safe);
+            var path = Path.Combine(dir, "preview.ttf");
             if (!File.Exists(path))
             {
+                Directory.CreateDirectory(dir);
                 var variant = e.Variants.Contains("400") ? "400"
                     : e.Variants.FirstOrDefault(v => !v.EndsWith("i")) ?? e.Variants.FirstOrDefault() ?? "400";
                 if (variant.EndsWith("i")) variant = variant.TrimEnd('i') + "italic";
@@ -708,19 +826,15 @@ namespace FontShelf.Services
                 var url = "https://fonts.googleapis.com/css?family=" + Uri.EscapeDataString(e.Family).Replace("%20", "+")
                           + ":" + variant + "&text=" + Uri.EscapeDataString(text);
                 var css = await Http.GetStringAsync(url);
-                var u = UrlRx.Match(css);
-                if (!u.Success || css.Contains("woff2")) return null;
-                var fileUrl = u.Groups["u"].Value.Trim('\'', '"', ' ');
+                var fileUrl = FindTtfUrl(css);
+                if (fileUrl == null) return null;
                 var bytes = await Http.GetByteArrayAsync(fileUrl);
+                if (!IsSfnt(bytes)) return null;
                 var tmp = path + ".tmp";
                 await File.WriteAllBytesAsync(tmp, bytes);
                 File.Move(tmp, path, true);
             }
-            return await Task.Run(() =>
-            {
-                try { return Fonts.GetFontFamilies(new Uri(path)).FirstOrDefault(); }
-                catch { return null; }
-            });
+            return await Task.Run(() => LoadFamilyFromFile(path));
         }
 
         private static readonly Regex FaceRx = new Regex(@"@font-face\s*\{(?<body>[^}]*)\}", RegexOptions.Compiled);
@@ -743,16 +857,14 @@ namespace FontShelf.Services
             foreach (Match m in FaceRx.Matches(css))
             {
                 var body = m.Groups["body"].Value;
-                var u = UrlRx.Match(body);
-                if (!u.Success) continue;
-                var fileUrl = u.Groups["u"].Value.Trim('\'', '"', ' ');
-                if (!done.Add(fileUrl)) continue;
-                var ext = Path.GetExtension(new Uri(fileUrl).AbsolutePath).ToLowerInvariant();
-                if (ext != ".ttf" && ext != ".otf") continue;
+                var fileUrl = FindTtfUrl(body);
+                if (fileUrl == null || !done.Add(fileUrl)) continue;
+                var ext = body.Contains("opentype") ? ".otf" : ".ttf";
                 var weight = WeightRx.Match(body).Groups["v"].Value;
                 var italic = StyleRx.Match(body).Groups["v"].Value == "italic";
                 var name = $"{e.Family.Replace(" ", "")}-{weight}{(italic ? "Italic" : "")}{ext}";
                 var bytes = await Http.GetByteArrayAsync(fileUrl);
+                if (!IsSfnt(bytes)) continue;
                 await File.WriteAllBytesAsync(Path.Combine(dir, name), bytes);
                 n++;
             }

@@ -177,7 +177,7 @@
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
             <Setter Property="Background" Value="{DynamicResource InputBrush}"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
-            <Setter Property="CaretBrush" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="SelectionBrush" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="Padding" Value="10,7"/>
             <Setter Property="FontSize" Value="13"/>
@@ -190,7 +190,7 @@
                             <Grid>
                                 <TextBlock x:Name="Ph" Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
                                            Foreground="{DynamicResource SubTextBrush}" Margin="{TemplateBinding Padding}"
-                                           Padding="2,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
+                                           Padding="5,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
                                            Visibility="Collapsed" TextTrimming="CharacterEllipsis"/>
                                 <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
                                               VerticalAlignment="Center" Focusable="False"/>
@@ -219,7 +219,7 @@
                         <Grid Background="Transparent">
                             <TextBlock x:Name="Ph" Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
                                        Foreground="{DynamicResource SubTextBrush}" Margin="{TemplateBinding Padding}"
-                                       Padding="2,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
+                                       Padding="5,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
                                        Visibility="Collapsed" TextTrimming="CharacterEllipsis"/>
                             <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
                                           VerticalAlignment="Center" Focusable="False"/>
