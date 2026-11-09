@@ -576,8 +576,8 @@
 
                     <!-- Zaglavlje -->
                     <DockPanel Margin="32,24,24,0">
-                        <Border DockPanel.Dock="Right" Background="{DynamicResource ControlBrush}" CornerRadius="8" Padding="3"
-                                VerticalAlignment="Center" Visibility="{Binding IsLibraryMode, Converter={StaticResource BoolVis}}">
+                        <Border DockPanel.Dock="Right" Background="{DynamicResource ControlBrush}" CornerRadius="10" Padding="4"
+                                Height="40" VerticalAlignment="Center" Visibility="{Binding IsLibraryMode, Converter={StaticResource BoolVis}}">
                             <StackPanel Orientation="Horizontal">
                                 <RadioButton Style="{StaticResource SegmentButton}" IsChecked="{Binding IsListMode}" ToolTip="Popis">
                                     <StackPanel Orientation="Horizontal">
@@ -601,7 +601,7 @@
                             </StackPanel>
                         </Border>
                         <ToggleButton DockPanel.Dock="Right" Style="{StaticResource PillToggle}" Margin="0,0,10,0" VerticalAlignment="Center"
-                                      IsChecked="{Binding ShowFilters}" ToolTip="Napredni filteri (kontrast, debljina, širina, serifi…)"
+                                      Height="40" IsChecked="{Binding ShowFilters}" ToolTip="Napredni filteri (kontrast, debljina, širina, serifi…)"
                                       Visibility="{Binding IsLibraryMode, Converter={StaticResource BoolVis}}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE71C;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center"
@@ -645,17 +645,18 @@
                                 </StackPanel>
                             </Grid>
                         </Border>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0"
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="10,0,0,0" Height="40"
                                     Visibility="{Binding IsLibraryMode, Converter={StaticResource BoolVis}}">
-                            <Border Background="{DynamicResource ControlBrush}" CornerRadius="8" Padding="3" VerticalAlignment="Center">
+                            <Border Background="{DynamicResource ControlBrush}" CornerRadius="10" Padding="4">
                                 <StackPanel Orientation="Horizontal">
                                     <RadioButton Style="{StaticResource SegmentButton}" Content="Redak" IsChecked="{Binding IsLinePreview}"/>
                                     <RadioButton Style="{StaticResource SegmentButton}" Content="Odlomak" IsChecked="{Binding IsParagraphPreview}"/>
                                     <RadioButton Style="{StaticResource SegmentButton}" Content="Abeceda" IsChecked="{Binding IsAlphabetPreview}"/>
                                 </StackPanel>
                             </Border>
-                            <Button Style="{StaticResource GhostButton}" Click="Sort_Click" Margin="8,0,0,0" VerticalAlignment="Center"
-                                    ToolTip="Klikni za promjenu redoslijeda" Foreground="{DynamicResource SubTextBrush}">
+                            <Button Style="{StaticResource GhostButton}" Click="Sort_Click" Margin="10,0,0,0" Padding="14,0"
+                                    Background="{DynamicResource ControlBrush}"
+                                    ToolTip="Klikni za promjenu redoslijeda" Foreground="{DynamicResource TextBrush}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE8CB;" FontFamily="{StaticResource IconFont}" FontSize="12" VerticalAlignment="Center"
                                                Margin="0,0,8,0"/>

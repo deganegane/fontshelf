@@ -120,11 +120,53 @@ namespace FontShelf.Services
                         fi.Italic = (sel & 1) != 0 ? 1 : (sel & 0x200) != 0 ? 2 : 0;
                     }
                     if (string.IsNullOrWhiteSpace(fi.Face)) fi.Face = "Regular";
+                    if (string.IsNullOrWhiteSpace(n16)) SplitStyleWords(fi);
                     result.Add(fi);
                 }
             }
             catch { }
             return result;
+        }
+
+        // Riječi koje označavaju stil, a ne obitelj (kad font nema ispravno ime obitelji, nameID 16)
+        private static readonly string[] StyleWords =
+        {
+            "Hairline", "Thin", "ExtraLight", "UltraLight", "Extra Light", "Ultra Light", "Light", "SemiLight", "Semi Light",
+            "Book", "Regular", "Normal", "Medium", "SemiBold", "DemiBold", "Semi Bold", "Demi Bold", "Bold",
+            "ExtraBold", "UltraBold", "Extra Bold", "Ultra Bold", "Black", "Heavy", "ExtraBlack", "UltraBlack", "Extra Black",
+            "Condensed", "SemiCondensed", "ExtraCondensed", "UltraCondensed", "Semi Condensed", "Extra Condensed", "Cond",
+            "Narrow", "Compressed", "Expanded", "SemiExpanded", "ExtraExpanded", "Extended", "Wide",
+            "Italic", "Oblique", "Slanted"
+        };
+
+        /// <summary>"Abhaya Libre ExtraBold" + "Regular" → obitelj "Abhaya Libre", lice "ExtraBold".</summary>
+        private static void SplitStyleWords(FaceInfo fi)
+        {
+            var family = fi.Family;
+            var stripped = new List<string>();
+            bool changed = true;
+            while (changed)
+            {
+                changed = false;
+                foreach (var w in StyleWords.OrderByDescending(x => x.Length))
+                {
+                    if (family.Length > w.Length + 1 && family.EndsWith(" " + w, StringComparison.OrdinalIgnoreCase))
+                    {
+                        stripped.Insert(0, family.Substring(family.Length - w.Length));
+                        family = family.Substring(0, family.Length - w.Length - 1).TrimEnd(' ', '-');
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            if (stripped.Count == 0 || string.IsNullOrWhiteSpace(family)) return;
+            fi.Family = family;
+            var face = fi.Face;
+            var parts = new List<string>(stripped);
+            if (!string.Equals(face, "Regular", StringComparison.OrdinalIgnoreCase)
+                && !parts.Any(p => string.Equals(p, face, StringComparison.OrdinalIgnoreCase)))
+                parts.Add(face);
+            fi.Face = string.Join(" ", parts);
         }
 
         public static bool HasVariations(string file)

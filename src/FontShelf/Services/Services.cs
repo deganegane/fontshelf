@@ -228,7 +228,7 @@ namespace FontShelf.Services
             public List<FaceInfo> Faces { get; set; }
         }
 
-        private static string FastCachePath => Path.Combine(AppPaths.Local, "installed-fonts-cache-v1.json");
+        private static string FastCachePath => Path.Combine(AppPaths.Local, "installed-fonts-cache-v2.json");
 
         private static IEnumerable<string> RegisteredFontFiles()
         {
