@@ -146,12 +146,14 @@ namespace FontShelf.ViewModels
                     OnPropertyChanged(nameof(PreviewSizeText));
                     OnPropertyChanged(nameof(CardFontSize));
                     OnPropertyChanged(nameof(OverlaySize));
+                    OnPropertyChanged(nameof(GooglePreviewSize));
                     _lib.PreviewSize = v;
                     ScheduleSave();
                 }
             }
         }
         public string PreviewSizeText => $"{PreviewSize:0} pt";
+        public double GooglePreviewSize => Math.Min(PreviewSize, 64);
         public double OverlaySize => Math.Max(60, PreviewSize * 2.4);
 
         private FontItem _selectedFont;
@@ -1130,6 +1132,27 @@ namespace FontShelf.ViewModels
                 StatusText = $"Preuzimanje „{e.Family}” nije uspjelo: {ex.Message}";
             }
             e.IsDownloading = false;
+        }
+
+        private readonly System.Threading.SemaphoreSlim _previewGate = new System.Threading.SemaphoreSlim(6);
+
+        public async void EnsureGooglePreview(GoogleFontEntry e)
+        {
+            if (e == null || e.PreviewRequested) return;
+            e.PreviewRequested = true;
+            await _previewGate.WaitAsync();
+            try
+            {
+                var fam = await GoogleFontsService.GetPreviewFamilyAsync(e, EffectivePreviewText);
+                if (fam != null) e.PreviewFamily = fam;
+                else e.PreviewStatus = "Pregled nije dostupan";
+            }
+            catch
+            {
+                e.PreviewStatus = "Pregled nije dostupan (provjeri vezu)";
+                e.PreviewRequested = false; // pokušaj ponovno kad se redak opet prikaže
+            }
+            finally { _previewGate.Release(); }
         }
 
         public FontItem FindDownloadedGoogleFont(GoogleFontEntry e)

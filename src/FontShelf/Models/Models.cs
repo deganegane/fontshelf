@@ -203,6 +203,14 @@ namespace FontShelf.Models
         private bool _isDownloading;
         public bool IsDownloading { get => _isDownloading; set { if (Set(ref _isDownloading, value)) OnPropertyChanged(nameof(ButtonText)); } }
 
+        private FontFamily _previewFamily;
+        public FontFamily PreviewFamily { get => _previewFamily; set => Set(ref _previewFamily, value); }
+
+        public bool PreviewRequested { get; set; }
+
+        private string _previewStatus = "Učitavam pregled…";
+        public string PreviewStatus { get => _previewStatus; set => Set(ref _previewStatus, value); }
+
         public string ButtonText => IsDownloading ? "Preuzimam…" : IsDownloaded ? "Preuzeto ✓" : "Preuzmi";
     }
 

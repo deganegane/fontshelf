@@ -442,7 +442,7 @@
                     </DockPanel>
 
                     <!-- Traka za pregled (FontBase stil) -->
-                    <Grid Grid.Row="1" Margin="32,18,24,14" Visibility="{Binding IsLibraryMode, Converter={StaticResource BoolVis}}">
+                    <Grid Grid.Row="1" Margin="32,18,24,14">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -470,7 +470,8 @@
                                 </StackPanel>
                             </Grid>
                         </Border>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0">
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0"
+                                    Visibility="{Binding IsLibraryMode, Converter={StaticResource BoolVis}}">
                             <Border Background="{DynamicResource ControlBrush}" CornerRadius="8" Padding="3" VerticalAlignment="Center">
                                 <StackPanel Orientation="Horizontal">
                                     <RadioButton Style="{StaticResource SegmentButton}" Content="Redak" IsChecked="{Binding IsLinePreview}"/>
@@ -613,7 +614,7 @@
                     </StackPanel>
 
                     <!-- Usporedba -->
-                    <Grid Grid.Row="1" Grid.RowSpan="2" Margin="32,18,24,0" Visibility="{Binding ShowCompare, Converter={StaticResource BoolVis}}">
+                    <Grid Grid.Row="2" Margin="32,0,24,0" Visibility="{Binding ShowCompare, Converter={StaticResource BoolVis}}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
@@ -810,13 +811,13 @@
                     </Grid>
 
                     <!-- Google Fonts -->
-                    <Grid Grid.Row="1" Grid.RowSpan="2" Margin="32,18,12,0" Visibility="{Binding IsGoogleMode, Converter={StaticResource BoolVis}}">
+                    <Grid Grid.Row="2" Margin="12,0,0,0" Visibility="{Binding IsGoogleMode, Converter={StaticResource BoolVis}}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <DockPanel Margin="0,0,12,12">
+                        <DockPanel Margin="20,0,24,12">
                             <Button DockPanel.Dock="Right" Style="{StaticResource GhostButton}" Foreground="{DynamicResource SubTextBrush}"
                                     Click="RefreshGoogle_Click">
                                 <StackPanel Orientation="Horizontal">
@@ -836,27 +837,44 @@
                                 </StackPanel>
                             </Border>
                         </DockPanel>
-                        <TextBlock Grid.Row="1" Text="{Binding GoogleStatus}" Foreground="{DynamicResource SubTextBrush}" Margin="0,0,0,10"
+                        <TextBlock Grid.Row="1" Text="{Binding GoogleStatus}" Foreground="{DynamicResource SubTextBrush}" Margin="20,0,24,10"
                                    TextWrapping="Wrap"/>
                         <ListBox Grid.Row="2" Style="{StaticResource PlainList}" ItemsSource="{Binding GoogleView}"
-                                 ItemContainerStyle="{StaticResource FontCardItem}"
+                                 ItemContainerStyle="{StaticResource FontRowItem}"
                                  VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                                  VirtualizingPanel.ScrollUnit="Pixel" ScrollViewer.CanContentScroll="True">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <DockPanel>
-                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Button Style="{StaticResource ActionButton}" Margin="0,0,6,0" Content="Prikaži"
-                                                    Visibility="{Binding IsDownloaded, Converter={StaticResource BoolVis}}"
-                                                    Click="ShowGoogleFont_Click"/>
-                                            <Button Style="{StaticResource AccentButton}" Margin="0" Content="{Binding ButtonText}"
-                                                    Click="DownloadGoogle_Click" MinWidth="100"/>
-                                        </StackPanel>
-                                        <StackPanel VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Family}" FontFamily="{StaticResource DisplayFont}" FontSize="19" FontWeight="SemiBold"/>
-                                            <TextBlock Text="{Binding Info}" Foreground="{DynamicResource SubTextBrush}" FontSize="12" Margin="0,2,0,0"/>
-                                        </StackPanel>
-                                    </DockPanel>
+                                    <Grid DataContextChanged="GoogleRow_DataContextChanged" Loaded="GoogleRow_Loaded">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <DockPanel>
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Button Style="{StaticResource ActionButton}" Margin="0,0,6,0" Content="Prikaži"
+                                                        Visibility="{Binding IsDownloaded, Converter={StaticResource BoolVis}}"
+                                                        Click="ShowGoogleFont_Click"/>
+                                                <Button Style="{StaticResource AccentButton}" Margin="0" Content="{Binding ButtonText}"
+                                                        Click="DownloadGoogle_Click" MinWidth="100"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Family}" FontWeight="SemiBold" FontSize="12.5"
+                                                           Foreground="{DynamicResource SubTextBrush}"/>
+                                                <TextBlock Text="·" Foreground="{DynamicResource SubTextBrush}" FontSize="12" Margin="7,0" Opacity="0.6"/>
+                                                <TextBlock Text="{Binding Info}" Foreground="{DynamicResource SubTextBrush}" FontSize="12" Opacity="0.85"/>
+                                            </StackPanel>
+                                        </DockPanel>
+                                        <Grid Grid.Row="1" Margin="0,6,10,0" MinHeight="{Binding DataContext.GooglePreviewSize, RelativeSource={RelativeSource AncestorType=Window}}">
+                                            <TextBlock Text="{Binding DataContext.EffectivePreviewText, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                       FontFamily="{Binding PreviewFamily}" TextTrimming="CharacterEllipsis"
+                                                       FontSize="{Binding DataContext.GooglePreviewSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                       Visibility="{Binding PreviewFamily, Converter={StaticResource NullVis}}"/>
+                                            <TextBlock Text="{Binding PreviewStatus}" Foreground="{DynamicResource SubTextBrush}" FontSize="13"
+                                                       VerticalAlignment="Center"
+                                                       Visibility="{Binding PreviewFamily, Converter={StaticResource NullVisInv}}"/>
+                                        </Grid>
+                                    </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>

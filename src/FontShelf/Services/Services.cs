@@ -318,6 +318,27 @@ namespace FontShelf.Services
             catch { return null; }
         }
 
+        /// <summary>Vraća putanju s pravim velikim/malim slovima (WPF je vraća velikim slovima).</summary>
+        public static string RealCase(string path)
+        {
+            try
+            {
+                var fi = new FileInfo(path);
+                if (!fi.Exists) return path;
+                var parts = new Stack<string>();
+                var dir = fi.Directory;
+                parts.Push(dir.GetFiles(fi.Name).FirstOrDefault()?.Name ?? fi.Name);
+                while (dir.Parent != null)
+                {
+                    parts.Push(dir.Parent.GetDirectories(dir.Name).FirstOrDefault()?.Name ?? dir.Name);
+                    dir = dir.Parent;
+                }
+                parts.Push(dir.Name.ToUpperInvariant());
+                return Path.Combine(parts.ToArray());
+            }
+            catch { return path; }
+        }
+
         public static AnalysisResult Analyze(FontItem f)
         {
             var res = new AnalysisResult();
@@ -337,7 +358,7 @@ namespace FontShelf.Services
                 res.Version = Pick(g.VersionStrings).Replace("Version ", "");
                 res.Designer = Pick(g.DesignerNames);
                 res.Manufacturer = Pick(g.ManufacturerNames);
-                res.MainFile = f.MainFile ?? FileOf(g);
+                res.MainFile = f.MainFile ?? RealCase(FileOf(g));
                 if (res.MainFile != null) res.IsVariable = OpenTypeReader.HasVariations(res.MainFile);
             }
             catch { }
@@ -593,6 +614,41 @@ namespace FontShelf.Services
                 catch { }
             }
             return list.OrderBy(e => e.Popularity).ToList();
+        }
+
+        public static string PreviewDir => Path.Combine(AppPaths.Local, "GooglePreview");
+
+        private const string PreviewChars =
+            "ABCČĆDĐEFGHIJKLMNOPQRSŠTUVWXYZŽabcčćdđefghijklmnopqrsštuvwxyzž0123456789 .,:;!?'\"-–—()&@€$%/+*#„“”’";
+
+        /// <summary>Preuzme mali podskup fonta (samo potrebni znakovi) za pregled prije preuzimanja.</summary>
+        public static async Task<FontFamily> GetPreviewFamilyAsync(GoogleFontEntry e, string extraText)
+        {
+            Directory.CreateDirectory(PreviewDir);
+            var safe = new string(e.Family.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c).ToArray());
+            var path = Path.Combine(PreviewDir, safe + ".ttf");
+            if (!File.Exists(path))
+            {
+                var variant = e.Variants.Contains("400") ? "400"
+                    : e.Variants.FirstOrDefault(v => !v.EndsWith("i")) ?? e.Variants.FirstOrDefault() ?? "400";
+                if (variant.EndsWith("i")) variant = variant.TrimEnd('i') + "italic";
+                var text = new string((PreviewChars + e.Family + (extraText ?? "")).Where(ch => !char.IsControl(ch)).Distinct().ToArray());
+                var url = "https://fonts.googleapis.com/css?family=" + Uri.EscapeDataString(e.Family).Replace("%20", "+")
+                          + ":" + variant + "&text=" + Uri.EscapeDataString(text);
+                var css = await Http.GetStringAsync(url);
+                var u = UrlRx.Match(css);
+                if (!u.Success || css.Contains("woff2")) return null;
+                var fileUrl = u.Groups["u"].Value.Trim('\'', '"', ' ');
+                var bytes = await Http.GetByteArrayAsync(fileUrl);
+                var tmp = path + ".tmp";
+                await File.WriteAllBytesAsync(tmp, bytes);
+                File.Move(tmp, path, true);
+            }
+            return await Task.Run(() =>
+            {
+                try { return Fonts.GetFontFamilies(new Uri(path)).FirstOrDefault(); }
+                catch { return null; }
+            });
         }
 
         private static readonly Regex FaceRx = new Regex(@"@font-face\s*\{(?<body>[^}]*)\}", RegexOptions.Compiled);

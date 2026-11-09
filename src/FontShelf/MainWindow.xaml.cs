@@ -118,6 +118,14 @@ namespace FontShelf
         private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
         private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
         private const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
+        private const int GWL_STYLE = -16;
+        private const int WS_SYSMENU = 0x00080000;
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
+        private static extern int GetWindowLong(IntPtr hwnd, int index);
+
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
+        private static extern int SetWindowLong(IntPtr hwnd, int index, int value);
 
         private IntPtr Handle => new WindowInteropHelper(this).Handle;
 
@@ -139,6 +147,12 @@ namespace FontShelf
                     int mica = 2; // DWMSBT_MAINWINDOW
                     if (DwmSetWindowAttribute(Handle, DWMWA_SYSTEMBACKDROP_TYPE, ref mica, sizeof(int)) != 0)
                         DisableMica();
+                    else
+                    {
+                        // Bez sistemskog izbornika Windows ne crta svoje gumbe ispod naših
+                        int style = GetWindowLong(Handle, GWL_STYLE);
+                        SetWindowLong(Handle, GWL_STYLE, style & ~WS_SYSMENU);
+                    }
                 }
                 catch { DisableMica(); }
             }
@@ -423,6 +437,17 @@ namespace FontShelf
         {
             var g = Ctx<GoogleFontEntry>(sender);
             if (g != null) await _vm.DownloadGoogleAsync(g);
+        }
+
+        private void GoogleRow_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (e.NewValue is GoogleFontEntry g) _vm.EnsureGooglePreview(g);
+        }
+
+        private void GoogleRow_Loaded(object sender, RoutedEventArgs e)
+        {
+            var g = Ctx<GoogleFontEntry>(sender);
+            if (g != null) _vm.EnsureGooglePreview(g);
         }
 
         private void ShowGoogleFont_Click(object sender, RoutedEventArgs e)
