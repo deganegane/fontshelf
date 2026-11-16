@@ -29,6 +29,35 @@ jobs:
           -p:Version=1.0.${{ github.run_number }}
           -o out
 
+      - name: Test dodavanja hrvatskih znakova
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force test/out | Out-Null
+          $fonts = @("ofl/abeezee/ABeeZee-Regular.ttf","ofl/abeezee/ABeeZee-Italic.ttf","ofl/abel/Abel-Regular.ttf","apache/aclonica/Aclonica-Regular.ttf")
+          foreach ($f in $fonts) { Invoke-WebRequest "https://raw.githubusercontent.com/google/fonts/main/$f" -OutFile ("test/" + (Split-Path $f -Leaf)) }
+          python -m pip install -q fonttools opentype-sanitizer pillow
+          python tools/make_nocaron.py test/ABeeZee-Regular.ttf test/NoCaron-Regular.ttf
+          $outDir = (Resolve-Path test/out).Path
+          foreach ($ttf in Get-ChildItem test/*.ttf) {
+            $dst = Join-Path $outDir ($ttf.BaseName + "-HR.ttf")
+            $p = Start-Process -FilePath out/FontShelf.exe -ArgumentList @("--patch-hr", "`"$($ttf.FullName)`"", "`"$dst`"") -Wait -PassThru
+            if ($p.ExitCode -ne 0) { Write-Host "Greška za $($ttf.Name):"; Get-Content "$dst.err"; exit 1 }
+            Get-Content "$dst.log"
+          }
+          python tools/check_patched.py test/out
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Spremi rezultate testa
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ci-test -y --cleanup-tag 2>/dev/null || true
+          if ls test/out/* >/dev/null 2>&1; then
+            gh release create ci-test test/out/* --prerelease --title "CI test (ne preuzimati)" --notes "Automatski test dodavanja hrvatskih znakova." --latest=false || true
+          fi
+
       - name: Create release
         shell: bash
         env:
