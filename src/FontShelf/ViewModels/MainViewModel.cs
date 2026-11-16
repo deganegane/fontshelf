@@ -226,7 +226,7 @@ namespace FontShelf.ViewModels
         public string StatusText { get => _statusText; set => Set(ref _statusText, value); }
 
         private bool _isBusy;
-        public bool IsBusy { get => _isBusy; private set => Set(ref _isBusy, value); }
+        public bool IsBusy { get => _isBusy; set => Set(ref _isBusy, value); }
 
         #endregion
 
@@ -1024,6 +1024,22 @@ namespace FontShelf.ViewModels
             UpdateCounts();
             await AnalyzeAsync(fresh);
             ScheduleSave();
+        }
+
+        /// <summary>Pronađe font po nazivu obitelji i označi ga (prebaci na "Svi fontovi" ako nije vidljiv).</summary>
+        public bool SelectFontByName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            var f = _all.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (f == null) return false;
+            if (FontsView == null || !FontsView.Cast<FontItem>().Contains(f))
+            {
+                SearchText = "";
+                ResetFilters();
+                SelectedEntry = LibraryEntries.FirstOrDefault(e => e.Kind == SidebarKind.All);
+            }
+            SelectedFont = f;
+            return true;
         }
 
         public async Task RemoveFolderAsync(string path)
