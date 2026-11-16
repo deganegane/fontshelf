@@ -32,6 +32,7 @@ jobs:
       - name: Test dodavanja hrvatskih znakova
         shell: pwsh
         run: |
+          $env:PYTHONIOENCODING = "utf-8"
           New-Item -ItemType Directory -Force test/out | Out-Null
           $fonts = @("ofl/abeezee/ABeeZee-Regular.ttf","ofl/abeezee/ABeeZee-Italic.ttf","ofl/abel/Abel-Regular.ttf","apache/aclonica/Aclonica-Regular.ttf")
           foreach ($f in $fonts) { Invoke-WebRequest "https://raw.githubusercontent.com/google/fonts/main/$f" -OutFile ("test/" + (Split-Path $f -Leaf)) }
