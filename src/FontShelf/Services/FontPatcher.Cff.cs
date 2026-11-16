@@ -552,7 +552,19 @@ namespace FontShelf.Services
                     }
                 }
 
-                int fdIdx = _fdSelect[baseGid];
+                return AddContours(list, _fdSelect[baseGid], advance, name);
+            }
+
+            /// <summary>Doda glif od odabranih kontura postojećeg glifa (npr. samo akcent iz é).</summary>
+            public int AddSubset(int gid, List<int> keep, int advance, string name)
+            {
+                var src = Outlines(gid);
+                var list = keep.OrderBy(i => i).Where(i => i >= 0 && i < src.Count).Select(i => src[i]).ToList();
+                return AddContours(list, _fdSelect[gid], advance, name);
+            }
+
+            private int AddContours(List<Contour> list, int fdIdx, int advance, string name)
+            {
                 var fd = _fds[Math.Min(fdIdx, _fds.Count - 1)];
                 _cs.Add(Encode(list, advance - fd.Nominal));
                 _fdSelect.Add(fdIdx);

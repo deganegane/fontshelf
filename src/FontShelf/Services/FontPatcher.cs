@@ -251,7 +251,7 @@ namespace FontShelf.Services
             {
                 int endPt = ends[c];
                 int count = endPt - startPt + 1;
-                if (count < 2) { startPt = endPt + 1; continue; }
+                if (count < 2) { polys.Add(new List<(double, double)>()); startPt = endPt + 1; continue; }
                 var pts = new List<(double x, double y, bool on)>();
                 for (int i = startPt; i <= endPt; i++) pts.Add((xs[i], ys[i], (flags[i] & 1) != 0));
                 // umetni implicitne točke na krivulji između dviju kontrolnih
@@ -264,7 +264,7 @@ namespace FontShelf.Services
                     if (!a.on && !b.on) full.Add(((a.x + b.x) / 2, (a.y + b.y) / 2, true));
                 }
                 int first = full.FindIndex(q => q.on);
-                if (first < 0) { startPt = endPt + 1; continue; }
+                if (first < 0) { polys.Add(new List<(double, double)>()); startPt = endPt + 1; continue; }
                 var poly = new List<(double, double)>();
                 int m = full.Count;
                 for (int k = 0; k < m; k++)
@@ -318,6 +318,97 @@ namespace FontShelf.Services
                 else if (before != 0 && wind == 0) spans.Add((startX, h.x));
             }
             return spans;
+        }
+
+        // ------------------------------------------------------------------ akcenti iz postojećih slova
+        // Slova iz kojih se može "posuditi" akcent kakav je nacrtao dizajner (redoslijed = prednost).
+        private static readonly (int cp, char b)[] AcuteLower = { (0x107, 'c'), (0x15B, 's'), (0x144, 'n'), (0xE9, 'e'), (0xE1, 'a'), (0xF3, 'o'), (0xFA, 'u') };
+        private static readonly (int cp, char b)[] AcuteUpper = { (0x106, 'C'), (0x15A, 'S'), (0x143, 'N'), (0xC9, 'E'), (0xC1, 'A'), (0xD3, 'O'), (0xDA, 'U') };
+        private static readonly (int cp, char b)[] CaronLower = { (0x10D, 'c'), (0x161, 's'), (0x17E, 'z'), (0x11B, 'e'), (0x148, 'n'), (0x159, 'r') };
+        private static readonly (int cp, char b)[] CaronUpper = { (0x10C, 'C'), (0x160, 'S'), (0x17D, 'Z'), (0x11A, 'E'), (0x147, 'N'), (0x158, 'R') };
+
+        private class AccentSrc
+        {
+            public int Gid;
+            public double Dx, Dy;      // položaj akcenta u slovu iz kojeg je uzet
+            public double BaseCX;      // središte osnovnog slova u tom slovu
+            public double Lift;        // dodatno podizanje (malo slovo -> veliko)
+        }
+
+        /// <summary>Komponente složenog TrueType glifa (null ako nisu jednostavni pomaci).</summary>
+        private static List<(int gid, int dx, int dy)> Components(byte[] g)
+        {
+            if (g == null || g.Length < 10 || I16(g, 0) >= 0) return null;
+            var list = new List<(int, int, int)>();
+            int p = 10;
+            while (p + 4 <= g.Length)
+            {
+                int flags = U16(g, p), cg = U16(g, p + 2);
+                p += 4;
+                if ((flags & 2) == 0) return null; // poravnanje po točkama
+                int dx, dy;
+                if ((flags & 1) != 0) { dx = I16(g, p); dy = I16(g, p + 2); p += 4; }
+                else { dx = (sbyte)g[p]; dy = (sbyte)g[p + 1]; p += 2; }
+                if ((flags & (0x8 | 0x40 | 0x80)) != 0) return null; // skalirano
+                list.Add((cg, dx, dy));
+                if ((flags & 0x20) == 0) break;
+            }
+            return list;
+        }
+
+        /// <summary>Novi jednostavni TrueType glif od odabranih kontura postojećeg (bez instrukcija).</summary>
+        private static byte[] SubsetSimple(byte[] g, List<int> keep)
+        {
+            int nc = I16(g, 0);
+            var ends = new int[nc];
+            for (int i = 0; i < nc; i++) ends[i] = U16(g, 10 + 2 * i);
+            int np = ends[nc - 1] + 1;
+            int p = 10 + 2 * nc;
+            p += 2 + U16(g, p);
+            var flags = new byte[np];
+            for (int i = 0; i < np;)
+            {
+                byte f = g[p++];
+                flags[i++] = f;
+                if ((f & 8) != 0) { int rep = g[p++]; for (int k = 0; k < rep && i < np; k++) flags[i++] = f; }
+            }
+            var xs = new int[np]; var ys = new int[np];
+            int v = 0;
+            for (int i = 0; i < np; i++)
+            {
+                byte f = flags[i];
+                if ((f & 2) != 0) { int dv = g[p++]; v += (f & 16) != 0 ? dv : -dv; }
+                else if ((f & 16) == 0) { v += I16(g, p); p += 2; }
+                xs[i] = v;
+            }
+            v = 0;
+            for (int i = 0; i < np; i++)
+            {
+                byte f = flags[i];
+                if ((f & 4) != 0) { int dv = g[p++]; v += (f & 32) != 0 ? dv : -dv; }
+                else if ((f & 32) == 0) { v += I16(g, p); p += 2; }
+                ys[i] = v;
+            }
+            var pts = new List<(int x, int y, bool on)>();
+            var newEnds = new List<int>();
+            keep = keep.OrderBy(k => k).ToList();
+            foreach (var c in keep)
+            {
+                int start = c == 0 ? 0 : ends[c - 1] + 1;
+                for (int i = start; i <= ends[c]; i++) pts.Add((xs[i], ys[i], (flags[i] & 1) != 0));
+                newEnds.Add(pts.Count - 1);
+            }
+            var b = new Buf();
+            b.U16(newEnds.Count);
+            b.U16(pts.Min(q => q.x) & 0xFFFF); b.U16(pts.Min(q => q.y) & 0xFFFF);
+            b.U16(pts.Max(q => q.x) & 0xFFFF); b.U16(pts.Max(q => q.y) & 0xFFFF);
+            foreach (var e in newEnds) b.U16(e);
+            b.U16(0); // bez instrukcija
+            foreach (var q in pts) b.U8(q.on ? 1 : 0);
+            int lx = 0, ly = 0;
+            foreach (var q in pts) { b.U16((q.x - lx) & 0xFFFF); lx = q.x; }
+            foreach (var q in pts) { b.U16((q.y - ly) & 0xFFFF); ly = q.y; }
+            return b.ToArray();
         }
 
         // ------------------------------------------------------------------ glavni postupak
@@ -419,6 +510,74 @@ namespace FontShelf.Services
             var newNames = new List<string>();
             double minGap = upem * 0.03 + o.AccentGap;
 
+            // dodaj novi (neimenovani u cmap-u) glif i njegove metrike
+            int AddGlyphFromContours(int donor, List<int> keep, string nm)
+            {
+                int gidNew;
+                if (isCff) gidNew = cff.AddSubset(donor, keep, adv[donor], nm);
+                else { glyphs.Add(SubsetSimple(glyphs[donor], keep)); gidNew = glyphs.Count - 1; }
+                adv.Add(adv[donor]);
+                var nb = Box(gidNew);
+                lsb.Add(nb.Empty ? 0 : nb.XMin);
+                newNames.Add(nm);
+                return gidNew;
+            }
+
+            AccentSrc FromDonors((int cp, char b)[] list, string nm)
+            {
+                foreach (var (dcp, db) in list)
+                {
+                    if (!cmap.Map.ContainsKey(dcp)) continue;
+                    int dg = Gid(dcp), bg = Gid(db);
+                    if (dg <= 0 || bg <= 0) continue;
+                    var bBox = Box(bg);
+                    if (bBox.Empty) continue;
+                    if (!isCff && glyphs[dg].Length >= 10 && I16(glyphs[dg], 0) < 0)
+                    {
+                        var cs = Components(glyphs[dg]);
+                        if (cs == null || cs.Count != 2) continue;
+                        int bi = cs.FindIndex(c => c.gid == bg);
+                        if (bi < 0) continue;
+                        var acc = cs[1 - bi];
+                        var accBox = Box(acc.gid);
+                        if (accBox.Empty || accBox.YMin + acc.dy < bBox.YMax * 0.6 + cs[bi].dy) continue;
+                        return new AccentSrc { Gid = acc.gid, Dx = acc.dx, Dy = acc.dy, BaseCX = bBox.CX + cs[bi].dx };
+                    }
+                    var dp = Poly(dg);
+                    var bp = Poly(bg);
+                    if (dp == null || bp == null) continue;
+                    int m = dp.Count(x => x.Count > 0) - bp.Count(x => x.Count > 0);
+                    if (m < 1 || m > 4) continue;
+                    var keep = Enumerable.Range(0, dp.Count).Where(i => dp[i].Count > 0)
+                        .OrderByDescending(i => dp[i].Min(q => q.y)).Take(m).ToList();
+                    if (keep.Any(i => dp[i].Min(q => q.y) < bBox.YMax * 0.6)) continue;
+                    // kontrola: preostale konture moraju odgovarati osnovnom slovu
+                    var restTop = Enumerable.Range(0, dp.Count).Where(i => dp[i].Count > 0 && !keep.Contains(i)).Select(i => dp[i].Max(q => q.y)).DefaultIfEmpty(0).Max();
+                    if (Math.Abs(restTop - bBox.YMax) > upem * 0.05) continue;
+                    int ng2 = AddGlyphFromContours(dg, keep, nm);
+                    return new AccentSrc { Gid = ng2, BaseCX = bBox.CX };
+                }
+                return null;
+            }
+
+            var accentCache = new Dictionary<(Kind, bool), AccentSrc>();
+            AccentSrc GetAccent(Kind k, bool up)
+            {
+                if (accentCache.TryGetValue((k, up), out var a)) return a;
+                if (up)
+                {
+                    a = FromDonors(k == Kind.Acute ? AcuteUpper : CaronUpper, k == Kind.Acute ? "acute.cap.hr" : "caron.cap.hr");
+                    if (a == null)
+                    {
+                        var low = GetAccent(k, false);
+                        if (low != null) a = new AccentSrc { Gid = low.Gid, Dx = low.Dx, Dy = low.Dy, BaseCX = low.BaseCX, Lift = capHeight - xHeight };
+                    }
+                }
+                else a = FromDonors(k == Kind.Acute ? AcuteLower : CaronLower, k == Kind.Acute ? "acute.hr" : "caron.hr");
+                accentCache[(k, up)] = a;
+                return a;
+            }
+
             foreach (var (cp, baseCh, kind, gname) in Targets)
             {
                 var label = char.ConvertFromUtf32(cp);
@@ -474,6 +633,16 @@ namespace FontShelf.Services
                     int dx = (int)Math.Round(cx - hb.CX * sx);
                     int dy = (int)Math.Round(cy - hb.CY * sy);
                     comps.Add((hyphenG, dx, dy, sx, sy, false));
+                }
+                else if (GetAccent(kind, upper) is AccentSrc src)
+                {
+                    var ab = Box(src.Gid);
+                    double bottom = ab.YMin + src.Dy + src.Lift + o.AccentGap;
+                    double dy = src.Dy + src.Lift + o.AccentGap;
+                    double floor = bb.YMax + upem * 0.01;
+                    if (bottom < floor) dy += floor - bottom;
+                    double dx = src.Dx + bb.CX - src.BaseCX + slant * (dy - src.Dy);
+                    comps.Add((src.Gid, (int)Math.Round(dx), (int)Math.Round(dy), 1, 1, false));
                 }
                 else
                 {
