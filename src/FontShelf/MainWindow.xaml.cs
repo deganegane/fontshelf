@@ -607,7 +607,7 @@ namespace FontShelf
             if (fonts.Count == 0) return;
             var ok = MessageBox.Show(this,
                 $"Za {Plural.Fonts(fonts.Count)} bez hrvatskih znakova napravit ću kopije s dodanim č ć đ š ž (zadane postavke).\n\n" +
-                "Originali ostaju netaknuti, a kopije se spremaju u mapu „Hrvatski fontovi”. Fontovi koji nisu TrueType (.otf/CFF) ili su varijabilni bit će preskočeni.",
+                "Originali ostaju netaknuti, a kopije se spremaju u mapu „Hrvatski fontovi”. Varijabilni fontovi i kolekcije (.ttc) bit će preskočeni.",
                 "Dodaj hrvatske znakove", MessageBoxButton.OKCancel, MessageBoxImage.Question);
             if (ok != MessageBoxResult.OK) return;
 
@@ -629,7 +629,7 @@ namespace FontShelf
             finally { _vm.IsBusy = false; }
             _vm.StatusText = skipped == 0
                 ? $"Gotovo: {Plural.Fonts(done)} s hrvatskim znakovima u mapi „Hrvatski fontovi”."
-                : $"Gotovo: {Plural.Fonts(done)} dodano, {skipped} preskočeno (OTF/CFF, varijabilni ili oštećeni).";
+                : $"Gotovo: {Plural.Fonts(done)} dodano, {skipped} preskočeno (varijabilni, .ttc ili oštećeni).";
         }
 
         private async void AddCroatian_Click(object sender, RoutedEventArgs e)

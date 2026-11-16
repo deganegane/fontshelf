@@ -8,7 +8,7 @@ out_dir = sys.argv[1]
 want = [0x10D, 0x107, 0x161, 0x17E, 0x111, 0x10C, 0x106, 0x160, 0x17D, 0x110]
 ok = True
 sheets = []
-for path in sorted(glob.glob(os.path.join(out_dir, "*-HR.ttf"))):
+for path in sorted(glob.glob(os.path.join(out_dir, "*-HR.ttf")) + glob.glob(os.path.join(out_dir, "*-HR.otf"))):
     name = os.path.basename(path)
     try:
         f = TTFont(path)
@@ -23,6 +23,18 @@ for path in sorted(glob.glob(os.path.join(out_dir, "*-HR.ttf"))):
         assert f["maxp"].numGlyphs == len(f.getGlyphOrder())
         fam = f["name"].getDebugName(1)
         buf = io.BytesIO(); f.save(buf)
+        # usporedba s pravim glifovima izvornog fonta (ako postoji)
+        base = name.replace("-HR", "")
+        orig = os.path.join(os.path.dirname(out_dir.rstrip("/\\")), "orig", base)
+        if os.path.exists(orig):
+            o = TTFont(orig)
+            ocm, ogs = o.getBestCmap(), o.getGlyphSet()
+            for cp in want:
+                if cp in ocm and cp in cmap:
+                    b1 = BoundsPen(ogs); ogs[ocm[cp]].draw(b1)
+                    b2 = BoundsPen(gs); gs[cmap[cp]].draw(b2)
+                    d = [round(b - a) for a, b in zip(b1.bounds, b2.bounds)]
+                    print(f"  {chr(cp)} izvornik={tuple(round(v) for v in b1.bounds)} novo={tuple(round(v) for v in b2.bounds)} razlika={d}")
         print(f"{name}: obitelj='{fam}', nedostaje='{''.join(missing)}', glifova={f['maxp'].numGlyphs}")
         if missing:
             ok = False
@@ -49,7 +61,7 @@ for path in sorted(glob.glob(os.path.join(out_dir, "*-HR.ttf"))):
         small = ImageFont.truetype(path, 34)
         d.text((24, 20), "čćšžđ ČĆŠŽĐ", font=big, fill="black")
         d.text((24, 170), "Gojazni đačić s biciklom drži hmelj. ŠĐČĆŽ šđčćž", font=small, fill="black")
-        p = path.replace(".ttf", ".png")
+        p = os.path.splitext(path)[0] + ".png"
         img.save(p)
         sheets.append(p)
     except Exception as e:

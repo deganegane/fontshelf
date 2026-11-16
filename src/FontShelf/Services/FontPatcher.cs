@@ -24,6 +24,8 @@ namespace FontShelf.Services
         public List<string> Skipped = new List<string>();
         public string NewFamily;
         public int UnitsPerEm;
+        public bool IsCff;
+        public string Extension => IsCff ? ".otf" : ".ttf";
     }
 
     public class FontPatchException : Exception
@@ -32,10 +34,10 @@ namespace FontShelf.Services
     }
 
     /// <summary>
-    /// Dodaje č ć š ž đ Č Ć Š Ž Đ u TrueType font slaganjem postojećih dijelova (složeni glifovi):
-    /// slovo + kvačica/akcent, odnosno slovo + crtica. Radi samo s TTF (glyf) fontovima.
+    /// Dodaje č ć š ž đ Č Ć Š Ž Đ u TrueType ili CFF (.otf) font slaganjem postojećih dijelova:
+    /// slovo + kvačica/akcent, odnosno slovo + crtica (TTF: složeni glifovi, CFF: spojeni obrisi).
     /// </summary>
-    public static class FontPatcher
+    public static partial class FontPatcher
     {
         private enum Kind { Caron, Acute, Bar }
 
@@ -81,8 +83,7 @@ namespace FontShelf.Services
             if (d.Length < 12) throw new FontPatchException("Datoteka nije font.");
             uint ver = U32(d, 0);
             if (ver == 0x74746366) throw new FontPatchException("Kolekcije fontova (.ttc) još nisu podržane.");
-            if (ver == 0x4F54544F) throw new FontPatchException("Ovaj font je OpenType s CFF obrisima — zasad su podržani samo TrueType (TTF) fontovi.");
-            if (ver != 0x00010000 && ver != 0x74727565) throw new FontPatchException("Nepoznat format fonta.");
+            if (ver != 0x00010000 && ver != 0x74727565 && ver != 0x4F54544F) throw new FontPatchException("Nepoznat format fonta.");
             int n = U16(d, 4);
             var t = new Dictionary<string, byte[]>();
             for (int i = 0; i < n; i++)
@@ -337,14 +338,14 @@ namespace FontShelf.Services
         {
             o ??= new PatchOptions();
             var t = ReadTables(font);
-            foreach (var need in new[] { "head", "hhea", "hmtx", "maxp", "cmap", "loca", "glyf" })
+            if (t.ContainsKey("fvar") || t.ContainsKey("CFF2"))
+                throw new FontPatchException("Varijabilni fontovi još nisu podržani. Koristi statičnu inačicu fonta (npr. Regular).");
+            bool isCff = t.ContainsKey("CFF ");
+            foreach (var need in isCff ? new[] { "head", "hhea", "hmtx", "maxp", "cmap" } : new[] { "head", "hhea", "hmtx", "maxp", "cmap", "loca", "glyf" })
                 if (!t.ContainsKey(need))
                     throw new FontPatchException(need == "glyf" || need == "loca"
-                        ? "Font nema TrueType obrise (glyf) — zasad su podržani samo TTF fontovi."
+                        ? "Font nema ni TrueType ni CFF obrise."
                         : "Fontu nedostaje tablica " + need + ".");
-            if (t.ContainsKey("fvar"))
-                throw new FontPatchException("Varijabilni fontovi još nisu podržani. Koristi statičnu inačicu fonta (npr. Regular).");
-
             var head = (byte[])t["head"].Clone();
             var hhea = (byte[])t["hhea"].Clone();
             var maxp = (byte[])t["maxp"].Clone();
@@ -354,13 +355,19 @@ namespace FontShelf.Services
             int numHM = U16(hhea, 34);
 
             // glifovi
-            var loca = t["loca"];
-            var glyf = t["glyf"];
-            var offs = new long[numGlyphs + 1];
-            for (int i = 0; i <= numGlyphs; i++)
-                offs[i] = locFmt == 0 ? U16(loca, 2 * i) * 2L : U32(loca, 4 * i);
             var glyphs = new List<byte[]>(numGlyphs + 16);
-            for (int i = 0; i < numGlyphs; i++)
+            CffFont cff = null;
+            if (isCff)
+            {
+                cff = new CffFont(t["CFF "]);
+                if (cff.Count != numGlyphs) throw new FontPatchException("Broj znakova u CFF tablici ne odgovara fontu.");
+            }
+            var loca = isCff ? null : t["loca"];
+            var glyf = isCff ? null : t["glyf"];
+            var offs = new long[numGlyphs + 1];
+            for (int i = 0; !isCff && i <= numGlyphs; i++)
+                offs[i] = locFmt == 0 ? U16(loca, 2 * i) * 2L : U32(loca, 4 * i);
+            for (int i = 0; !isCff && i < numGlyphs; i++)
             {
                 long a = offs[i], b = offs[i + 1];
                 if (b <= a || b > glyf.Length) { glyphs.Add(new byte[0]); continue; }
@@ -380,9 +387,13 @@ namespace FontShelf.Services
                 else { adv.Add(lastAdv); int o2 = 4 * numHM + 2 * (i - numHM); lsb.Add(o2 + 2 <= hmtx.Length ? I16(hmtx, o2) : 0); }
             }
 
+            BBox Box(int g) => isCff ? cff.Box(g) : BoxOf(glyphs[g]);
+            List<List<(double x, double y)>> Poly(int g) => isCff ? cff.Poly(g) : Outline(glyphs[g]);
+            int GlyphCount() => isCff ? cff.Count : glyphs.Count;
+
             var cmap = ReadCmap(t["cmap"]);
-            int Gid(int cp) => cmap.Map.TryGetValue(cp, out var g) && g < glyphs.Count ? g : -1;
-            int FirstGid(params int[] cps) { foreach (var cp in cps) { var g = Gid(cp); if (g > 0 && !BoxOf(glyphs[g]).Empty) return g; } return -1; }
+            int Gid(int cp) => cmap.Map.TryGetValue(cp, out var g) && g < GlyphCount() ? g : -1;
+            int FirstGid(params int[] cps) { foreach (var cp in cps) { var g = Gid(cp); if (g > 0 && !Box(g).Empty) return g; } return -1; }
 
             // mjere fonta
             int xHeight = 0, capHeight = 0;
@@ -391,8 +402,8 @@ namespace FontShelf.Services
                 xHeight = I16(os2r, 86);
                 capHeight = I16(os2r, 88);
             }
-            if (xHeight <= 0) { var g = Gid('x'); xHeight = g > 0 ? BoxOf(glyphs[g]).YMax : (int)(upem * 0.5); }
-            if (capHeight <= 0) { var g = Gid('H'); capHeight = g > 0 ? BoxOf(glyphs[g]).YMax : (int)(upem * 0.7); }
+            if (xHeight <= 0) { var g = Gid('x'); xHeight = g > 0 ? Box(g).YMax : (int)(upem * 0.5); }
+            if (capHeight <= 0) { var g = Gid('H'); capHeight = g > 0 ? Box(g).YMax : (int)(upem * 0.7); }
             double italic = 0;
             if (t.TryGetValue("post", out var postr) && postr.Length >= 8) italic = I32(postr, 4) / 65536.0;
             double slant = Math.Tan(-italic * Math.PI / 180.0);
@@ -403,7 +414,7 @@ namespace FontShelf.Services
             int hyphenG = FirstGid(0x002D, 0x2010, 0x00AD, 0x2212, 0x00AF);
             int ethG = FirstGid(0x00D0);
 
-            var res = new PatchResult { UnitsPerEm = upem };
+            var res = new PatchResult { UnitsPerEm = upem, IsCff = isCff };
             var newCmap = new Dictionary<int, int>(cmap.Map);
             var newNames = new List<string>();
             double minGap = upem * 0.03 + o.AccentGap;
@@ -413,8 +424,8 @@ namespace FontShelf.Services
                 var label = char.ConvertFromUtf32(cp);
                 if (cmap.Map.ContainsKey(cp)) continue;
                 int baseG = Gid(baseCh);
-                if (baseG <= 0 || BoxOf(glyphs[baseG]).Empty) { res.Skipped.Add(label + " (nema slova " + baseCh + ")"); continue; }
-                var bb = BoxOf(glyphs[baseG]);
+                if (baseG <= 0 || Box(baseG).Empty) { res.Skipped.Add(label + " (nema slova " + baseCh + ")"); continue; }
+                var bb = Box(baseG);
                 bool upper = char.IsUpper(baseCh);
                 var comps = new List<(int gid, int dx, int dy, double sx, double sy, bool metrics)>
                 {
@@ -430,14 +441,14 @@ namespace FontShelf.Services
                         continue;
                     }
                     if (hyphenG <= 0) { res.Skipped.Add(label + " (nema crtice)"); continue; }
-                    var hb = BoxOf(glyphs[hyphenG]);
+                    var hb = Box(hyphenG);
                     if (hb.W <= 0 || hb.H <= 0) { res.Skipped.Add(label + " (neispravna crtica)"); continue; }
 
                     double cy = upper ? capHeight * 0.5 : xHeight + (bb.YMax - xHeight) * 0.52;
                     cy += o.BarShiftY;
                     // pronađi stupac slova na visini crtice
                     double stemA = double.NaN, stemB = double.NaN;
-                    var poly = Outline(glyphs[baseG]);
+                    var poly = Poly(baseG);
                     if (poly != null)
                     {
                         var spans = Spans(poly, cy);
@@ -471,7 +482,7 @@ namespace FontShelf.Services
                     else if (caronG > 0) accG = caronG;
                     else { accG = circG; flip = true; }
                     if (accG <= 0) { res.Skipped.Add(label + (kind == Kind.Acute ? " (nema akcenta ´)" : " (nema kvačice ˇ ni ˆ)")); continue; }
-                    var ab = BoxOf(glyphs[accG]);
+                    var ab = Box(accG);
                     double sy = flip ? -1 : 1;
                     // nakon zrcaljenja zadrži isti okomiti raspon
                     double flipDy = flip ? ab.YMin + ab.YMax : 0;
@@ -485,11 +496,21 @@ namespace FontShelf.Services
                     comps.Add((accG, (int)Math.Round(dx), (int)Math.Round(dy), 1, sy, false));
                 }
 
-                var glyph = BuildComposite(glyphs, comps);
-                glyphs.Add(glyph);
-                int ng = glyphs.Count - 1;
+                int ng;
+                if (isCff)
+                {
+                    ng = cff.AddComposite(comps, adv[baseG], gname);
+                    var nb = cff.Box(ng);
+                    lsb.Add(nb.Empty ? 0 : nb.XMin);
+                }
+                else
+                {
+                    var glyph = BuildComposite(glyphs, comps);
+                    glyphs.Add(glyph);
+                    ng = glyphs.Count - 1;
+                    lsb.Add(BoxOf(glyph).XMin);
+                }
                 adv.Add(adv[baseG]);
-                lsb.Add(BoxOf(glyph).XMin);
                 newCmap[cp] = ng;
                 newNames.Add(gname);
                 res.Added.Add(label);
@@ -501,9 +522,23 @@ namespace FontShelf.Services
                 return res;
             }
 
-            int newNum = glyphs.Count;
+            int newNum = GlyphCount();
             if (newNum > 65535) throw new FontPatchException("Font ima previše znakova.");
 
+            // ---- ime (prije CFF-a, jer i CFF nosi PostScript ime)
+            string psName = null;
+            if (o.Rename && t.TryGetValue("name", out var name))
+            {
+                var (tbl, fam, ps) = Rename(name, o.Suffix);
+                t["name"] = tbl;
+                res.NewFamily = fam;
+                psName = ps;
+            }
+
+            if (isCff)
+                t["CFF "] = cff.Build(psName);
+            else
+            {
             // ---- glyf + loca (dugi format)
             var gb = new Buf();
             var newLoca = new Buf();
@@ -517,6 +552,7 @@ namespace FontShelf.Services
             t["glyf"] = gb.ToArray();
             t["loca"] = newLoca.ToArray();
             W16(head, 50, 1);
+            }
 
             // ---- hmtx + hhea
             var hb2 = new Buf();
@@ -556,14 +592,6 @@ namespace FontShelf.Services
                 int maxCp = newCmap.Keys.Where(k => k <= 0xFFFF).DefaultIfEmpty(0).Max();
                 if (maxCp > last) W16(os2, 66, maxCp);
                 t["OS/2"] = os2;
-            }
-
-            // ---- ime
-            if (o.Rename && t.TryGetValue("name", out var name))
-            {
-                var (tbl, fam) = Rename(name, o.Suffix);
-                t["name"] = tbl;
-                res.NewFamily = fam;
             }
 
             // ---- tablice koje ovise o broju glifova ili potpisu
@@ -770,7 +798,7 @@ namespace FontShelf.Services
             return b.ToArray();
         }
 
-        private static (byte[] table, string family) Rename(byte[] name, string suffix)
+        private static (byte[] table, string family, string ps) Rename(byte[] name, string suffix)
         {
             int count = U16(name, 2), strOff = U16(name, 4);
             var recs = new List<(int plat, int enc, int lang, int id, string text)>();
@@ -842,7 +870,8 @@ namespace FontShelf.Services
                 storage.Bytes(data);
             }
             b.Bytes(storage.ToArray());
-            return (b.ToArray(), newFamily);
+            var ps = outRecs.Where(r => r.id == 6).Select(r => r.text).FirstOrDefault();
+            return (b.ToArray(), newFamily, ps);
         }
 
         private static uint Checksum(byte[] d)
@@ -874,7 +903,7 @@ namespace FontShelf.Services
 
             int offset = 12 + 16 * n;
             var dir = new Buf();
-            dir.U32(0x00010000); dir.U16(n); dir.U16(pow * 16); dir.U16(log); dir.U16(n * 16 - pow * 16);
+            dir.U32(t.ContainsKey("CFF ") ? 0x4F54544Fu : 0x00010000u); dir.U16(n); dir.U16(pow * 16); dir.U16(log); dir.U16(n * 16 - pow * 16);
             var body = new Buf();
             int headPos = -1;
             foreach (var tag in tags)

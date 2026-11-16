@@ -37,9 +37,16 @@ jobs:
           foreach ($f in $fonts) { Invoke-WebRequest "https://raw.githubusercontent.com/google/fonts/main/$f" -OutFile ("test/" + (Split-Path $f -Leaf)) }
           python -m pip install -q fonttools opentype-sanitizer pillow
           python tools/make_nocaron.py test/ABeeZee-Regular.ttf test/NoCaron-Regular.ttf
+          New-Item -ItemType Directory -Force test/orig | Out-Null
+          $otfs = @("source-sans/release/OTF/SourceSans3-Regular.otf","source-serif/release/OTF/SourceSerif4-It.otf","source-code-pro/release/OTF/SourceCodePro-Bold.otf","source-han-sans/release/SubsetOTF/KR/SourceHanSansKR-Regular.otf")
+          foreach ($f in $otfs) { Invoke-WebRequest "https://raw.githubusercontent.com/adobe-fonts/$f" -OutFile ("test/orig/" + (Split-Path $f -Leaf)) }
+          python tools/strip_hr.py test/orig/SourceSans3-Regular.otf test/SourceSans3-Regular.otf noeth
+          python tools/strip_hr.py test/orig/SourceSerif4-It.otf test/SourceSerif4-It.otf nocaron noeth
+          python tools/strip_hr.py test/orig/SourceCodePro-Bold.otf test/SourceCodePro-Bold.otf
+          python tools/strip_hr.py test/orig/SourceHanSansKR-Regular.otf test/SourceHanSansKR-Regular.otf noeth
           $outDir = (Resolve-Path test/out).Path
-          foreach ($ttf in Get-ChildItem test/*.ttf) {
-            $dst = Join-Path $outDir ($ttf.BaseName + "-HR.ttf")
+          foreach ($ttf in Get-ChildItem test/* -Include *.ttf,*.otf -File) {
+            $dst = Join-Path $outDir ($ttf.BaseName + "-HR" + $ttf.Extension)
             $p = Start-Process -FilePath out/FontShelf.exe -ArgumentList @("--patch-hr", "`"$($ttf.FullName)`"", "`"$dst`"") -Wait -PassThru
             if ($p.ExitCode -ne 0) { Write-Host "Greška za $($ttf.Name):"; Get-Content "$dst.err"; exit 1 }
             Get-Content "$dst.log"

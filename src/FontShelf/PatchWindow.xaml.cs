@@ -116,7 +116,7 @@ namespace FontShelf
 
                 var dir = Path.Combine(Path.GetTempPath(), "FontShelf", "patch", Guid.NewGuid().ToString("N"));
                 Directory.CreateDirectory(dir);
-                var path = Path.Combine(dir, "preview.ttf");
+                var path = Path.Combine(dir, "preview" + r.Extension);
                 File.WriteAllBytes(path, r.Data);
                 var fam = GoogleFontsService.LoadFamilyFromFile(path);
                 if (fam != null)
@@ -158,7 +158,7 @@ namespace FontShelf
                         outDir = Path.Combine(OutputRoot, safe);
                         Directory.CreateDirectory(outDir);
                     }
-                    File.WriteAllBytes(Path.Combine(outDir, Path.GetFileNameWithoutExtension(f) + "-HR.ttf"), r.Data);
+                    File.WriteAllBytes(Path.Combine(outDir, Path.GetFileNameWithoutExtension(f) + "-HR" + r.Extension), r.Data);
                     ok++;
                 }
                 catch (Exception ex) { errs.Add(Path.GetFileName(f) + ": " + ex.Message); }
