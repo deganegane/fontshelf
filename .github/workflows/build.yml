@@ -55,6 +55,24 @@ jobs:
           python tools/check_patched.py test/out
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
+      - name: Test prozora za hrvatske znakove (WPF)
+        shell: pwsh
+        run: |
+          $fail = $false
+          foreach ($name in @("SourceSans3-Regular.otf","SourceSerif4-It.otf","SourceHanSansKR-Regular.otf","ABeeZee-Regular.ttf","Abel-Regular.ttf")) {
+            $src = (Resolve-Path "test/$name").Path
+            $dir = Join-Path (Resolve-Path test).Path ("ui/" + [IO.Path]::GetFileNameWithoutExtension($name))
+            New-Item -ItemType Directory -Force $dir | Out-Null
+            $p = Start-Process -FilePath out/FontShelf.exe -ArgumentList @("--ui-test", "`"$src`"", "`"$dir`"") -PassThru
+            if (-not $p.WaitForExit(180000)) { Write-Host "$name : ISTEKLO VRIJEME"; $p.Kill(); $fail = $true }
+            Write-Host "===== $name : izlaz $($p.ExitCode)"
+            if (Test-Path "$dir/trace.log") { Get-Content "$dir/trace.log" }
+            if (Test-Path "$dir/crash.log") { Get-Content "$dir/crash.log"; $fail = $true }
+            if ($p.ExitCode -ne 0) { $fail = $true }
+            Get-ChildItem "$dir/*.png" | ForEach-Object { Copy-Item $_ ("test/out/ui-" + $_.Name) }
+          }
+          if ($fail) { exit 1 }
+
       - name: Spremi rezultate testa
         if: always()
         shell: bash

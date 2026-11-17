@@ -15,7 +15,8 @@ namespace FontShelf
 {
     public partial class PatchWindow : Window
     {
-        public static string OutputRoot => Path.Combine(AppPaths.Local, "Hrvatski fontovi");
+        public static string OutputRootOverride;
+        public static string OutputRoot => OutputRootOverride ?? Path.Combine(AppPaths.Local, "Hrvatski fontovi");
 
         private readonly FontItem _font;
         private List<string> _files = new List<string>();
@@ -52,6 +53,7 @@ namespace FontShelf
         {
             TitleText.Text = $"Dodaj hrvatske znakove — {_font.Name}";
             _files = FontAnalyzer.AllFiles(_font).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            Diag.Log($"prozor: {_font.Name} [{_font.Key}] datoteke: {string.Join(" | ", _files)}");
             if (_files.Count == 0)
             {
                 Fail("Datoteke ovog fonta nije moguće pronaći.");
@@ -111,6 +113,7 @@ namespace FontShelf
             UpdateLabels();
             try
             {
+                Diag.Log("pregled: " + _previewFile);
                 var r = FontPatcher.Patch(_previewBytes, Options());
                 _upem = r.UnitsPerEm > 0 ? r.UnitsPerEm : _upem;
 
@@ -118,7 +121,9 @@ namespace FontShelf
                 Directory.CreateDirectory(dir);
                 var path = Path.Combine(dir, "preview" + r.Extension);
                 File.WriteAllBytes(path, r.Data);
+                Diag.Log("  učitavam pregled " + path);
                 var fam = GoogleFontsService.LoadFamilyFromFile(path);
+                Diag.Log("  pregled učitan: " + (fam?.Source ?? "null"));
                 if (fam != null)
                 {
                     PreviewBig.FontFamily = fam;
@@ -135,33 +140,38 @@ namespace FontShelf
                 SaveButton.Content = $"Spremi kao „{r.NewFamily}”";
                 SaveButton.IsEnabled = r.Added.Count > 0;
             }
-            catch (FontPatchException ex) { Fail(ex.Message); }
-            catch (Exception ex) { Fail("Font nije moguće obraditi: " + ex.Message); }
+            catch (FontPatchException ex) { Diag.Log("  " + ex.Message); Fail(ex.Message); }
+            catch (Exception ex) { Diag.Log("  " + ex); Fail("Font nije moguće obraditi: " + ex.Message); }
         }
 
         /// <summary>Zakrpa sve stilove jednog fonta zadanim postavkama. Vraća novu obitelj (ili null) i greške.</summary>
-        public static (string family, int saved, List<string> errors) PatchFiles(IEnumerable<string> files, PatchOptions opts)
+        public static (string family, int saved, List<string> errors) PatchFiles(IEnumerable<string> files, PatchOptions opts, string preferFile = null)
         {
-            string fam = null, outDir = null;
+            string fam = null;
             int ok = 0;
             var errs = new List<string>();
             foreach (var f in files)
             {
                 try
                 {
+                    Diag.Log("patch " + f);
                     var r = FontPatcher.Patch(File.ReadAllBytes(f), opts);
-                    if (r.Added.Count == 0) continue;
-                    fam ??= r.NewFamily;
-                    if (outDir == null)
-                    {
-                        var safe = new string((fam ?? "Font HR").Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c).ToArray());
-                        outDir = Path.Combine(OutputRoot, safe);
-                        Directory.CreateDirectory(outDir);
-                    }
-                    File.WriteAllBytes(Path.Combine(outDir, Path.GetFileNameWithoutExtension(f) + "-HR" + r.Extension), r.Data);
+                    if (r.Added.Count == 0) { Diag.Log("  nema promjena"); continue; }
+                    var famName = r.NewFamily ?? "Font HR";
+                    if (fam == null || string.Equals(f, preferFile, StringComparison.OrdinalIgnoreCase)) fam = famName;
+                    var safe = new string(famName.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c).ToArray()).Trim();
+                    var outDir = Path.Combine(OutputRoot, safe);
+                    Directory.CreateDirectory(outDir);
+                    var dest = Path.Combine(outDir, Path.GetFileNameWithoutExtension(f) + "-HR" + r.Extension);
+                    File.WriteAllBytes(dest, r.Data);
+                    Diag.Log("  spremljeno " + dest + " (" + string.Join("", r.Added) + ")");
                     ok++;
                 }
-                catch (Exception ex) { errs.Add(Path.GetFileName(f) + ": " + ex.Message); }
+                catch (Exception ex)
+                {
+                    Diag.Log("  greška: " + ex);
+                    errs.Add(Path.GetFileName(f) + ": " + ex.Message);
+                }
             }
             return (fam, ok, errs);
         }
@@ -183,30 +193,48 @@ namespace FontShelf
             DialogResult = false;
         }
 
-        private async void Save_Click(object sender, RoutedEventArgs e)
+        /// <summary>Spremi sve stilove; vraća true ako je bar jedan spremljen.</summary>
+        public async Task<bool> SaveAsync()
         {
             SaveButton.IsEnabled = false;
             var opts = Options();
             var files = _files.ToList();
+            Diag.Log($"spremanje: {_font.Name}, {files.Count} datoteka");
+            var (family, saved, errors) = await Task.Run(() => PatchFiles(files, opts, _previewFile));
+            if (saved == 0)
+            {
+                Fail("Spremanje nije uspjelo.\n" + string.Join("\n", errors));
+                return false;
+            }
+            SavedFamily = family;
+            Errors = errors;
+            return true;
+        }
+
+        public List<string> Errors { get; private set; } = new List<string>();
+
+        private async void Save_Click(object sender, RoutedEventArgs e)
+        {
             try
             {
-                var (family, saved, errors) = await Task.Run(() => PatchFiles(files, opts));
-
-                if (saved == 0)
-                {
-                    Fail("Spremanje nije uspjelo.\n" + string.Join("\n", errors));
-                    return;
-                }
-                SavedFamily = family;
-                if (errors.Count > 0)
-                    MessageBox.Show(this, "Neki stilovi nisu spremljeni:\n\n" + string.Join("\n", errors), "FontShelf",
+                if (!await SaveAsync()) return;
+                if (Errors.Count > 0)
+                    MessageBox.Show(this, "Neki stilovi nisu spremljeni:\n\n" + string.Join("\n", Errors), "FontShelf",
                         MessageBoxButton.OK, MessageBoxImage.Information);
                 DialogResult = true;
             }
             catch (Exception ex)
             {
+                Diag.Log("Save_Click: " + ex);
                 Fail("Spremanje nije uspjelo: " + ex.Message);
             }
+        }
+
+        // ---- za automatski test
+        public bool IsReady => _ready;
+        public void SetForTest(double gap, double barY, double barW)
+        {
+            GapSlider.Value = gap; BarYSlider.Value = barY; BarWSlider.Value = barW;
         }
     }
 }

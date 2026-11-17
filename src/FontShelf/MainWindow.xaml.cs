@@ -620,6 +620,7 @@ namespace FontShelf
                 {
                     var f = fonts[i];
                     _vm.StatusText = $"Dodajem hrvatske znakove… {i + 1}/{fonts.Count}: {f.Name}";
+                    Diag.Log("skupno: " + f.Name);
                     var files = FontAnalyzer.AllFiles(f).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                     var (fam, saved, _) = await Task.Run(() => PatchWindow.PatchFiles(files, opts));
                     if (saved > 0) done++; else skipped++;
@@ -636,17 +637,22 @@ namespace FontShelf
         {
             var font = _vm.SelectedFont;
             if (font == null) return;
+            Diag.Log("Dodaj čćđšž: " + font.Name);
             var win = new PatchWindow(font) { Owner = this };
             if (win.ShowDialog() != true || string.IsNullOrEmpty(win.SavedFamily)) return;
             try
             {
+                Diag.Log("ponovno učitavam " + PatchWindow.OutputRoot);
                 System.IO.Directory.CreateDirectory(PatchWindow.OutputRoot);
                 await _vm.ReloadFolderAsync(PatchWindow.OutputRoot);
+                Diag.Log("odabirem " + win.SavedFamily);
                 _vm.SelectFontByName(win.SavedFamily);
+                Diag.Log("gotovo");
                 _vm.StatusText = $"Spremljeno: {win.SavedFamily} (u mapi „Hrvatski fontovi”)";
             }
             catch (Exception ex)
             {
+                Diag.Log("greška pri učitavanju: " + ex);
                 _vm.StatusText = "Font je spremljen, ali ga nije moguće učitati: " + ex.Message;
             }
         }
