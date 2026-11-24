@@ -1,7 +1,7 @@
 <Window x:Class="FontShelf.PatchWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Dodaj hrvatske znakove" Width="840" Height="860" MinWidth="700" MinHeight="620"
+        Title="Dodaj hrvatske znakove" Width="900" Height="900" MinWidth="700" MinHeight="620"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         Background="{DynamicResource PanelBrush}" Foreground="{DynamicResource TextBrush}"
         FontFamily="{StaticResource UiFont}" FontSize="13" UseLayoutRounding="True"
@@ -64,6 +64,50 @@
                                Foreground="{DynamicResource SubTextBrush}" VerticalAlignment="Center"/>
                 </Grid>
 
+                <TextBlock Text="Ručni odabir znaka (kad font nema kvačicu ili akcent)" Style="{StaticResource DetailTitle}" Margin="0,18,0,4"/>
+                <TextBlock Foreground="{DynamicResource SubTextBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"
+                           Text="Upiši bilo koji znak iz fonta koji će glumiti kvačicu ili akcent (npr. v ili ^ za kvačicu, ' , / ili ` za akcent), pa mu podesi veličinu i zakret. Prazno polje = automatski."/>
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="110"/>
+                        <ColumnDefinition Width="60"/>
+                        <ColumnDefinition Width="70"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="50"/>
+                        <ColumnDefinition Width="60"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="50"/>
+                        <ColumnDefinition Width="120"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="40"/>
+                        <RowDefinition Height="40"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Kvačica (č š ž)" VerticalAlignment="Center"/>
+                    <TextBox x:Name="CaronBox" Grid.Column="1" MaxLength="2" Width="46" Height="30" HorizontalAlignment="Left"
+                             TextAlignment="Center" VerticalContentAlignment="Center" FontSize="15" TextChanged="Glyph_Changed"/>
+                    <TextBlock Grid.Column="2" Text="Veličina" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <Slider x:Name="CaronSSlider" Grid.Column="3" Minimum="0.2" Maximum="1.8" Value="1" IsMoveToPointEnabled="True" ValueChanged="Option_Changed"/>
+                    <TextBlock x:Name="CaronSVal" Grid.Column="4" TextAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <TextBlock Grid.Column="5" Text="Zakret" Margin="14,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <Slider x:Name="CaronRSlider" Grid.Column="6" Minimum="-90" Maximum="90" Value="0" IsMoveToPointEnabled="True" ValueChanged="Option_Changed"/>
+                    <TextBlock x:Name="CaronRVal" Grid.Column="7" TextAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <CheckBox x:Name="CaronFlipCheck" Grid.Column="8" Style="{StaticResource Switch}" Content="Naopako" Margin="16,0,0,0"
+                              VerticalAlignment="Center" Checked="Check_Changed" Unchecked="Check_Changed"/>
+
+                    <TextBlock Grid.Row="1" Text="Akcent (ć)" VerticalAlignment="Center"/>
+                    <TextBox x:Name="AcuteBox" Grid.Row="1" Grid.Column="1" MaxLength="2" Width="46" Height="30" HorizontalAlignment="Left"
+                             TextAlignment="Center" VerticalContentAlignment="Center" FontSize="15" TextChanged="Glyph_Changed"/>
+                    <TextBlock Grid.Row="1" Grid.Column="2" Text="Veličina" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <Slider x:Name="AcuteSSlider" Grid.Row="1" Grid.Column="3" Minimum="0.2" Maximum="1.8" Value="1" IsMoveToPointEnabled="True" ValueChanged="Option_Changed"/>
+                    <TextBlock x:Name="AcuteSVal" Grid.Row="1" Grid.Column="4" TextAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <TextBlock Grid.Row="1" Grid.Column="5" Text="Zakret" Margin="14,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <Slider x:Name="AcuteRSlider" Grid.Row="1" Grid.Column="6" Minimum="-90" Maximum="90" Value="0" IsMoveToPointEnabled="True" ValueChanged="Option_Changed"/>
+                    <TextBlock x:Name="AcuteRVal" Grid.Row="1" Grid.Column="7" TextAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <CheckBox x:Name="AcuteFlipCheck" Grid.Row="1" Grid.Column="8" Style="{StaticResource Switch}" Content="Naopako" Margin="16,0,0,0"
+                              VerticalAlignment="Center" Checked="Check_Changed" Unchecked="Check_Changed"/>
+                </Grid>
+
                 <TextBlock Text="Crtica na đ i Đ" Style="{StaticResource DetailTitle}" Margin="0,18,0,8"/>
                 <Grid Margin="0,0,0,6">
                     <Grid.ColumnDefinitions>
@@ -124,10 +168,12 @@
                       IsChecked="True" Margin="18,0,0,0" VerticalAlignment="Center" Visibility="Collapsed"
                       Checked="Include_Changed" Unchecked="Include_Changed"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Style="{StaticResource ActionButton}" Content="Odustani" Height="40" Padding="18,0" Margin="0,0,10,0"
+                <Button Style="{StaticResource ActionButton}" Content="Zatvori" Height="40" Padding="18,0" Margin="0,0,10,0"
                         IsCancel="True" Click="Cancel_Click"/>
+                <Button x:Name="SaveAllButton" Style="{StaticResource ActionButton}" Height="40" Padding="18,0" Margin="0,0,10,0"
+                        Content="Spremi sve" Click="SaveAll_Click" Visibility="Collapsed"/>
                 <Button x:Name="SaveButton" Style="{StaticResource AccentButton}" Height="40" Padding="18,0" Margin="0"
-                        Content="Spremi" Click="Save_Click"/>
+                        Content="Spremi ovaj font" Click="Save_Click"/>
             </StackPanel>
         </DockPanel>
     </Grid>

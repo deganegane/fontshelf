@@ -16,6 +16,15 @@ namespace FontShelf.Services
         public double AccentShiftX { get; set; }     // pomak kvačica/akcenta lijevo-desno (jedinice)
         public double BarShiftYUpper { get; set; }   // pomak crtice na Đ gore-dolje (jedinice)
         public bool UseEth { get; set; } = true;     // Đ = postojeće Ð ako ga font ima
+        // Ručni odabir znaka za kvačicu / akcent (0 = automatski) te veličina, zakret (stupnjevi) i zrcaljenje
+        public int CaronGlyph { get; set; }
+        public double CaronScale { get; set; } = 1.0;
+        public double CaronRotate { get; set; }
+        public bool CaronFlip { get; set; }
+        public int AcuteGlyph { get; set; }
+        public double AcuteScale { get; set; } = 1.0;
+        public double AcuteRotate { get; set; }
+        public bool AcuteFlip { get; set; }
         public string Suffix { get; set; } = "HR";
         public bool Rename { get; set; } = true;
     }
@@ -589,9 +598,9 @@ namespace FontShelf.Services
                 if (baseG <= 0 || Box(baseG).Empty) { res.Skipped.Add(label + " (nema slova " + baseCh + ")"); continue; }
                 var bb = Box(baseG);
                 bool upper = char.IsUpper(baseCh);
-                var comps = new List<(int gid, int dx, int dy, double sx, double sy, bool metrics)>
+                var comps = new List<(int gid, int dx, int dy, double sx, double sy, bool metrics, double m01, double m10)>
                 {
-                    (baseG, 0, 0, 1, 1, true)
+                    (baseG, 0, 0, 1, 1, true, 0, 0)
                 };
                 List<List<(double x, double y)>> barPolys = null;
 
@@ -666,7 +675,39 @@ namespace FontShelf.Services
                             barPolys.Add(new List<(double, double)> { (fb[i].a, yb), (fb[i].b, yb), (ft[i].b, yt), (ft[i].a, yt) });
                         }
                     }
-                    else comps.Add((hyphenG, dx, dy, sx, sy, false));
+                    else comps.Add((hyphenG, dx, dy, sx, sy, false, 0, 0));
+                }
+                else if (Custom(kind, o))
+                {
+                    // ručno odabran znak ili promijenjena veličina/zakret: akcent se slaže iznad slova
+                    bool ac = kind == Kind.Acute;
+                    int manual = ac ? o.AcuteGlyph : o.CaronGlyph;
+                    double scale = Math.Max(0.05, Math.Min(1.9, ac ? o.AcuteScale : o.CaronScale));
+                    double rot = (ac ? o.AcuteRotate : o.CaronRotate) * Math.PI / 180.0;
+                    bool flipV = ac ? o.AcuteFlip : o.CaronFlip;
+                    int accG;
+                    if (manual > 0)
+                    {
+                        accG = Gid(manual);
+                        if (accG <= 0 || Box(accG).Empty) { res.Skipped.Add(label + " (font nema znak " + char.ConvertFromUtf32(manual) + ")"); continue; }
+                    }
+                    else if (GetAccent(kind, false) is AccentSrc auto) accG = auto.Gid;
+                    else if (ac) accG = acuteG;
+                    else if (caronG > 0) accG = caronG;
+                    else { accG = circG; flipV = !flipV; }
+                    if (accG <= 0) { res.Skipped.Add(label + (ac ? " (nema akcenta ´)" : " (nema kvačice ˇ ni ˆ)")); continue; }
+                    double f = flipV ? -1 : 1;
+                    double a11 = scale * Math.Cos(rot), a12 = -scale * f * Math.Sin(rot);
+                    double a21 = scale * Math.Sin(rot), a22 = scale * f * Math.Cos(rot);
+                    var ab = Box(accG);
+                    var pts = Poly(accG)?.SelectMany(q => q).ToList();
+                    if (pts == null || pts.Count == 0)
+                        pts = new List<(double x, double y)> { (ab.XMin, ab.YMin), (ab.XMax, ab.YMin), (ab.XMax, ab.YMax), (ab.XMin, ab.YMax) };
+                    var tp = pts.Select(q => (x: a11 * q.x + a12 * q.y, y: a21 * q.x + a22 * q.y)).ToList();
+                    double txMin = tp.Min(q => q.x), txMax = tp.Max(q => q.x), tyMin = tp.Min(q => q.y);
+                    double dy = bb.YMax + minGap - tyMin;
+                    double dx = bb.CX - (txMin + txMax) / 2 + slant * (bb.YMax + minGap - bb.YMax / 2.0) + o.AccentShiftX;
+                    comps.Add((accG, (int)Math.Round(dx), (int)Math.Round(dy), a11, a22, false, a21, a12));
                 }
                 else if (GetAccent(kind, upper) is AccentSrc src)
                 {
@@ -676,7 +717,7 @@ namespace FontShelf.Services
                     double floor = bb.YMax + upem * 0.01;
                     if (bottom < floor) dy += floor - bottom;
                     double dx = src.Dx + bb.CX - src.BaseCX + slant * (dy - src.Dy) + o.AccentShiftX;
-                    comps.Add((src.Gid, (int)Math.Round(dx), (int)Math.Round(dy), 1, 1, false));
+                    comps.Add((src.Gid, (int)Math.Round(dx), (int)Math.Round(dy), 1, 1, false, 0, 0));
                 }
                 else
                 {
@@ -696,7 +737,7 @@ namespace FontShelf.Services
                     else dy += o.AccentGap;
                     double finalBottom = accBottom + dy - flipDy;
                     double dx = bb.CX - ab.CX + slant * (finalBottom - bb.YMax / 2.0) + o.AccentShiftX;
-                    comps.Add((accG, (int)Math.Round(dx), (int)Math.Round(dy), 1, sy, false));
+                    comps.Add((accG, (int)Math.Round(dx), (int)Math.Round(dy), 1, sy, false, 0, 0));
                 }
 
                 int ng;
@@ -807,19 +848,23 @@ namespace FontShelf.Services
             return res;
         }
 
-        private static byte[] BuildComposite(List<byte[]> glyphs, List<(int gid, int dx, int dy, double sx, double sy, bool metrics)> comps)
+        private static bool Custom(Kind k, PatchOptions o) => k == Kind.Acute
+            ? o.AcuteGlyph > 0 || Math.Abs(o.AcuteScale - 1) > 1e-6 || Math.Abs(o.AcuteRotate) > 1e-6 || o.AcuteFlip
+            : k == Kind.Caron && (o.CaronGlyph > 0 || Math.Abs(o.CaronScale - 1) > 1e-6 || Math.Abs(o.CaronRotate) > 1e-6 || o.CaronFlip);
+
+        private static byte[] BuildComposite(List<byte[]> glyphs, List<(int gid, int dx, int dy, double sx, double sy, bool metrics, double m01, double m10)> comps)
         {
             int xMin = int.MaxValue, yMin = int.MaxValue, xMax = int.MinValue, yMax = int.MinValue;
             foreach (var c in comps)
             {
                 var b = BoxOf(glyphs[c.gid]);
                 if (b.Empty) continue;
-                double x1 = b.XMin * c.sx + c.dx, x2 = b.XMax * c.sx + c.dx;
-                double y1 = b.YMin * c.sy + c.dy, y2 = b.YMax * c.sy + c.dy;
-                xMin = Math.Min(xMin, (int)Math.Floor(Math.Min(x1, x2)));
-                xMax = Math.Max(xMax, (int)Math.Ceiling(Math.Max(x1, x2)));
-                yMin = Math.Min(yMin, (int)Math.Floor(Math.Min(y1, y2)));
-                yMax = Math.Max(yMax, (int)Math.Ceiling(Math.Max(y1, y2)));
+                foreach (var (px, py) in new[] { (b.XMin, b.YMin), (b.XMax, b.YMin), (b.XMax, b.YMax), (b.XMin, b.YMax) })
+                {
+                    double x = px * c.sx + py * c.m10 + c.dx, y = px * c.m01 + py * c.sy + c.dy;
+                    xMin = Math.Min(xMin, (int)Math.Floor(x)); xMax = Math.Max(xMax, (int)Math.Ceiling(x));
+                    yMin = Math.Min(yMin, (int)Math.Floor(y)); yMax = Math.Max(yMax, (int)Math.Ceiling(y));
+                }
             }
             if (xMin == int.MaxValue) { xMin = yMin = xMax = yMax = 0; }
 
@@ -829,19 +874,22 @@ namespace FontShelf.Services
             for (int i = 0; i < comps.Count; i++)
             {
                 var c = comps[i];
-                bool scaled = Math.Abs(c.sx - 1) > 1e-6 || Math.Abs(c.sy - 1) > 1e-6;
+                bool matrix = Math.Abs(c.m01) > 1e-6 || Math.Abs(c.m10) > 1e-6;
+                bool scaled = !matrix && (Math.Abs(c.sx - 1) > 1e-6 || Math.Abs(c.sy - 1) > 1e-6);
                 bool uniform = Math.Abs(c.sx - c.sy) < 1e-6;
                 int flags = 0x0001 | 0x0002 | 0x0004 | 0x1000; // riječi, xy pomaci, zaokruži na mrežu, pomak se ne skalira
                 if (i < comps.Count - 1) flags |= 0x0020;
                 if (c.metrics) flags |= 0x0200;
                 if (scaled) flags |= uniform ? 0x0008 : 0x0040;
+                if (matrix) flags |= 0x0080;
                 b2.U16(flags);
                 b2.U16(c.gid);
                 b2.U16(Math.Max(-32768, Math.Min(32767, c.dx)) & 0xFFFF);
                 b2.U16(Math.Max(-32768, Math.Min(32767, c.dy)) & 0xFFFF);
+                int F(double v) => (int)Math.Round(Math.Max(-2, Math.Min(1.99993, v)) * 16384) & 0xFFFF;
+                if (matrix) { b2.U16(F(c.sx)); b2.U16(F(c.m01)); b2.U16(F(c.m10)); b2.U16(F(c.sy)); }
                 if (scaled)
                 {
-                    int F(double v) => (int)Math.Round(Math.Max(-2, Math.Min(1.99993, v)) * 16384) & 0xFFFF;
                     if (uniform) b2.U16(F(c.sx));
                     else { b2.U16(F(c.sx)); b2.U16(F(c.sy)); }
                 }

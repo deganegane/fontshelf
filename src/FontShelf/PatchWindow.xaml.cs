@@ -25,6 +25,10 @@ namespace FontShelf
             public double Gap, AccX, BarY, BarYU, BarX;
             public double BarW = 1, BarT = 1;
             public bool OwnD;
+            public string CaronCh = "", AcuteCh = "";
+            public double CaronS = 1, AcuteS = 1, CaronR, AcuteR;
+            public bool CaronFlip, AcuteFlip;
+            public bool Saved;
             public bool Include = true;
             public bool Failed;      // font se ne može obraditi (varijabilni, .ttc…)
             public bool Nothing;     // font već ima sve znakove
@@ -53,8 +57,11 @@ namespace FontShelf
 
         public PatchWindow(FontItem font) : this(new List<FontItem> { font }, 0) { }
 
-        public PatchWindow(List<FontItem> fonts, int index)
+        private readonly bool _batch;
+
+        public PatchWindow(List<FontItem> fonts, int index, bool batch = false)
         {
+            _batch = batch;
             _fonts = fonts;
             _index = Math.Max(0, Math.Min(index, fonts.Count - 1));
             foreach (var f in fonts) _settings[f] = new Settings();
@@ -80,7 +87,11 @@ namespace FontShelf
             if (_fonts.Count > 1)
             {
                 NavPanel.Visibility = Visibility.Visible;
-                IncludeCheck.Visibility = Visibility.Visible;
+                if (_batch)
+                {
+                    IncludeCheck.Visibility = Visibility.Visible;
+                    SaveAllButton.Visibility = Visibility.Visible;
+                }
                 HeaderPanel.Margin = new Thickness(0, 0, 200, 0);
             }
             LoadFont();
@@ -97,6 +108,10 @@ namespace FontShelf
             BarWSlider.Value = s.BarW; BarTSlider.Value = s.BarT;
             OwnDCheck.IsChecked = s.OwnD;
             IncludeCheck.IsChecked = s.Include;
+            CaronBox.Text = s.CaronCh; AcuteBox.Text = s.AcuteCh;
+            CaronSSlider.Value = s.CaronS; AcuteSSlider.Value = s.AcuteS;
+            CaronRSlider.Value = s.CaronR; AcuteRSlider.Value = s.AcuteR;
+            CaronFlipCheck.IsChecked = s.CaronFlip; AcuteFlipCheck.IsChecked = s.AcuteFlip;
             _loading = false;
 
             TitleText.Text = Font.Name;
@@ -133,6 +148,19 @@ namespace FontShelf
             s.BarW = BarWSlider.Value; s.BarT = BarTSlider.Value;
             s.OwnD = OwnDCheck.IsChecked == true;
             s.Include = IncludeCheck.IsChecked == true;
+            s.CaronCh = CaronBox.Text.Trim(); s.AcuteCh = AcuteBox.Text.Trim();
+            s.CaronS = CaronSSlider.Value; s.AcuteS = AcuteSSlider.Value;
+            s.CaronR = CaronRSlider.Value; s.AcuteR = AcuteRSlider.Value;
+            s.CaronFlip = CaronFlipCheck.IsChecked == true; s.AcuteFlip = AcuteFlipCheck.IsChecked == true;
+        }
+
+        private static int FirstCp(string t) => string.IsNullOrEmpty(t) ? 0 : char.ConvertToUtf32(t, 0);
+
+        private void Glyph_Changed(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            if (!IsLoaded || !_ready || _loading) return;
+            _debounce.Stop();
+            _debounce.Start();
         }
 
         private void Go(int delta)
@@ -176,8 +204,15 @@ namespace FontShelf
             BarShiftX = s.BarX * upem,
             BarWidthScale = s.BarW,
             BarThicknessScale = s.BarT,
-            UseEth = !s.OwnD
+            UseEth = !s.OwnD,
+            CaronGlyph = SafeCp(s.CaronCh), CaronScale = s.CaronS, CaronRotate = s.CaronR, CaronFlip = s.CaronFlip,
+            AcuteGlyph = SafeCp(s.AcuteCh), AcuteScale = s.AcuteS, AcuteRotate = s.AcuteR, AcuteFlip = s.AcuteFlip
         };
+
+        private static int SafeCp(string t)
+        {
+            try { return FirstCp(t); } catch { return 0; }
+        }
 
         private void UpdateLabels()
         {
@@ -188,6 +223,10 @@ namespace FontShelf
             BarXVal.Text = $"{BarXSlider.Value * 100:+0;-0;0}%";
             BarWVal.Text = $"{BarWSlider.Value * 100:0}%";
             BarTVal.Text = $"{BarTSlider.Value * 100:0}%";
+            CaronSVal.Text = $"{CaronSSlider.Value * 100:0}%";
+            AcuteSVal.Text = $"{AcuteSSlider.Value * 100:0}%";
+            CaronRVal.Text = $"{CaronRSlider.Value:+0;-0;0}°";
+            AcuteRVal.Text = $"{AcuteRSlider.Value:+0;-0;0}°";
         }
 
         private void Option_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -239,6 +278,9 @@ namespace FontShelf
                 Cur.Nothing = r.Added.Count == 0;
                 var added = r.Added.Count > 0 ? "Dodaju se: " + string.Join(" ", r.Added) : "Font već ima sve hrvatske znakove.";
                 var skipped = r.Skipped.Count > 0 ? "\nNije moguće dodati: " + string.Join(", ", r.Skipped) : "";
+                if (r.Skipped.Any(x => x.Contains("nema kvačice") || x.Contains("nema akcenta")))
+                    skipped += "\nFont nema gotovu kvačicu/akcent — upiši zamjenski znak u „Ručni odabir znaka”.";
+                if (Cur.Saved) added = "✓ Spremljeno. " + added;
                 var styles = r.Added.Count == 0 ? ""
                     : _files.Count > 1 ? $"\nSprema se {_files.Count} {Plural.Of(_files.Count, "stil", "stila", "stilova")}, kao „{r.NewFamily}”."
                     : $"\nSprema se kao „{r.NewFamily}”.";
@@ -252,15 +294,12 @@ namespace FontShelf
 
         private void UpdateSaveButton()
         {
-            if (_fonts.Count == 1)
-            {
-                SaveButton.Content = "Spremi kopiju s hrvatskim znakovima";
-                SaveButton.IsEnabled = !Cur.Failed && !Cur.Nothing;
-                return;
-            }
-            int n = _settings.Values.Count(s => s.Include && !s.Failed && !s.Nothing);
-            SaveButton.Content = $"Spremi sve uključene ({n})";
-            SaveButton.IsEnabled = n > 0;
+            SaveButton.Content = Cur.Saved ? "Spremi ponovno" : "Spremi ovaj font";
+            SaveButton.IsEnabled = !Cur.Failed && !Cur.Nothing;
+            if (!_batch) return;
+            int n = _settings.Values.Count(s => s.Include && !s.Failed && !s.Nothing && !s.Saved);
+            SaveAllButton.Content = $"Spremi sve uključene ({n})";
+            SaveAllButton.IsEnabled = n > 0;
         }
 
         private void Reset_Click(object sender, RoutedEventArgs e)
@@ -271,14 +310,14 @@ namespace FontShelf
             BarYSlider.Value = 0; BarYUSlider.Value = 0; BarXSlider.Value = 0;
             BarWSlider.Value = 1; BarTSlider.Value = 1;
             OwnDCheck.IsChecked = false;
+            CaronBox.Text = ""; AcuteBox.Text = "";
+            CaronSSlider.Value = 1; AcuteSSlider.Value = 1; CaronRSlider.Value = 0; AcuteRSlider.Value = 0;
+            CaronFlipCheck.IsChecked = false; AcuteFlipCheck.IsChecked = false;
             _ready = true;
             Regenerate();
         }
 
-        private void Cancel_Click(object sender, RoutedEventArgs e)
-        {
-            DialogResult = false;
-        }
+        private void Cancel_Click(object sender, RoutedEventArgs e) => Close();
 
         // ------------------------------------------------------------ spremanje
         /// <summary>
@@ -330,21 +369,22 @@ namespace FontShelf
             return (fam, ok, errs);
         }
 
-        /// <summary>Spremi sve uključene fontove; vraća true ako je bar jedan spremljen.</summary>
-        public async Task<bool> SaveAsync()
+        /// <summary>Spremi trenutni font ili sve uključene; vraća true ako je bar jedan spremljen.</summary>
+        public async Task<bool> SaveAsync(bool all)
         {
             StoreCurrent();
-            SaveButton.IsEnabled = false;
+            SaveButton.IsEnabled = SaveAllButton.IsEnabled = false;
             PrevButton.IsEnabled = NextButton.IsEnabled = false;
-            var jobs = _fonts.Where(f => _settings[f].Include && !_settings[f].Failed && !_settings[f].Nothing).ToList();
             var current = Font;
+            var jobs = all
+                ? _fonts.Where(f => _settings[f].Include && !_settings[f].Failed && !_settings[f].Nothing && !_settings[f].Saved).ToList()
+                : new List<FontItem> { current };
             var errors = new List<string>();
-            string lastFamily = null, currentFamily = null;
             int done = 0;
             for (int i = 0; i < jobs.Count; i++)
             {
                 var f = jobs[i];
-                if (jobs.Count > 1) SaveButton.Content = $"Spremam… {i + 1}/{jobs.Count}";
+                if (jobs.Count > 1) SaveAllButton.Content = $"Spremam… {i + 1}/{jobs.Count}";
                 var s = _settings[f];
                 var files = FontAnalyzer.AllFiles(f).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                 var prefer = f == current ? _previewFile : f.MainFile;
@@ -353,42 +393,48 @@ namespace FontShelf
                 if (saved > 0)
                 {
                     done++;
-                    lastFamily = family;
-                    if (f == current) currentFamily = family;
+                    s.Saved = true;
+                    SavedFamily = family;
                 }
                 else if (jobs.Count > 1 && errs.Count > 0) errors.Add(f.Name + ": " + errs[0]);
                 if (jobs.Count == 1) errors.AddRange(errs);
             }
             Errors = errors;
-            SavedFonts = done;
+            SavedFonts += done;
+            PrevButton.IsEnabled = _index > 0;
+            NextButton.IsEnabled = _index < _fonts.Count - 1;
+            UpdateSaveButton();
             if (done == 0)
             {
                 InfoText.Text = "Spremanje nije uspjelo.\n" + string.Join("\n", errors.Take(6));
                 InfoText.Foreground = (Brush)FindResource("WarnBrush");
-                PrevButton.IsEnabled = _index > 0;
-                NextButton.IsEnabled = _index < _fonts.Count - 1;
                 return false;
             }
-            SavedFamily = currentFamily ?? lastFamily;
             return true;
         }
 
-        private async void Save_Click(object sender, RoutedEventArgs e)
+        private async Task SaveAndReport(bool all)
         {
             try
             {
-                if (!await SaveAsync()) return;
+                if (!await SaveAsync(all)) return;
                 if (Errors.Count > 0)
                     MessageBox.Show(this, "Nije sve spremljeno:\n\n" + string.Join("\n", Errors.Take(12)), "FontShelf",
                         MessageBoxButton.OK, MessageBoxImage.Information);
-                DialogResult = true;
+                if (all || _fonts.Count == 1) { Close(); return; }
+                // nakon spremanja prijeđi na sljedeći font
+                if (_index < _fonts.Count - 1) Go(1);
+                else Regenerate();
             }
             catch (Exception ex)
             {
-                Diag.Log("Save_Click: " + ex);
+                Diag.Log("spremanje: " + ex);
                 InfoText.Text = "Spremanje nije uspjelo: " + ex.Message;
             }
         }
+
+        private async void Save_Click(object sender, RoutedEventArgs e) => await SaveAndReport(false);
+        private async void SaveAll_Click(object sender, RoutedEventArgs e) => await SaveAndReport(true);
 
         // ---- za automatski test
         public bool IsReady => _ready;
@@ -399,5 +445,10 @@ namespace FontShelf
             BarWSlider.Value = barW; OwnDCheck.IsChecked = ownD;
         }
         public void GoForTest(int delta) => Go(delta);
+        public void SetManualForTest(string caron, double cs, double cr, string acute, double asc, double ar)
+        {
+            CaronBox.Text = caron; CaronSSlider.Value = cs; CaronRSlider.Value = cr;
+            AcuteBox.Text = acute; AcuteSSlider.Value = asc; AcuteRSlider.Value = ar;
+        }
     }
 }

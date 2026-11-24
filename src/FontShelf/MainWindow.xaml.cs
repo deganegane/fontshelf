@@ -612,7 +612,7 @@ namespace FontShelf
             var fonts = _vm.FontsView.Cast<FontItem>().Where(f => f.MissingCroatian).ToList();
             if (fonts.Count == 0) return Task.CompletedTask;
             int start = _vm.SelectedFont != null ? Math.Max(0, fonts.IndexOf(_vm.SelectedFont)) : 0;
-            return RunPatchWindowAsync(new PatchWindow(fonts, start) { Owner = this });
+            return RunPatchWindowAsync(new PatchWindow(fonts, start, true) { Owner = this });
         }
 
         private async void AddCroatian_Click(object sender, RoutedEventArgs e)
@@ -620,12 +620,18 @@ namespace FontShelf
             var font = _vm.SelectedFont;
             if (font == null) return;
             Diag.Log("Dodaj čćđšž: " + font.Name);
-            await RunPatchWindowAsync(new PatchWindow(font) { Owner = this });
+            // popis za listanje: fontovi bez hrvatskih znakova u trenutnom prikazu (i odabrani font)
+            var list = _vm.FontsView != null && !_vm.IsGoogleMode
+                ? _vm.FontsView.Cast<FontItem>().Where(f => f.MissingCroatian || f == font).ToList()
+                : new List<FontItem>();
+            if (!list.Contains(font)) list = new List<FontItem> { font };
+            await RunPatchWindowAsync(new PatchWindow(list, list.IndexOf(font)) { Owner = this });
         }
 
         private async Task RunPatchWindowAsync(PatchWindow win)
         {
-            if (win.ShowDialog() != true || win.SavedFonts == 0) return;
+            win.ShowDialog();
+            if (win.SavedFonts == 0) return;
             try
             {
                 // stare inačice istih fontova makni iz biblioteke i s diska (ako se mogu obrisati)

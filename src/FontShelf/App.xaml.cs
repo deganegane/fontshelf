@@ -82,7 +82,7 @@ namespace FontShelf
                 // dva prolaza: drugi sprema iste fontove ponovno (zamjena postojećih mapa)
                 for (int pass = 0; pass < 2; pass++)
                 {
-                    var w = new PatchWindow(items, 0);
+                    var w = new PatchWindow(items, 0, true);
                     w.Show();
                     for (int n = 0; n < items.Count; n++)
                     {
@@ -94,11 +94,17 @@ namespace FontShelf
                             w.SetForTest(g, x, y, b, own);
                             await Task.Delay(450);
                         }
+                        if (pass == 1 && n % 2 == 0)
+                        {
+                            w.SetManualForTest("v", 0.5, 0, "/", 0.45, -15);
+                            await Task.Delay(450);
+                            Diag.Log("  ručni znak: " + w.InfoText.Text.Replace("\n", " / "));
+                        }
                         if (n < items.Count - 1) w.GoForTest(1);
                     }
                     w.GoForTest(-1);
                     await Task.Delay(300);
-                    if (!await w.SaveAsync()) throw new Exception("Spremanje nije uspjelo: " + w.InfoText.Text);
+                    if (!await w.SaveAsync(true)) throw new Exception("Spremanje nije uspjelo: " + w.InfoText.Text);
                     Diag.Log($"prolaz {pass + 1}: spremljeno {w.SavedFonts}, zamijenjeno mapa: {w.ReplacedDirs.Count}");
                     int expect = w.SavedFonts;
                     if (w.SavedFonts < items.Count - 1 || w.Errors.Count > 0) throw new Exception("Nisu spremljeni svi fontovi: " + string.Join("; ", w.Errors));
