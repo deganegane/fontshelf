@@ -62,6 +62,7 @@ jobs:
           $srcDir = Join-Path (Resolve-Path test).Path "ui-src"
           New-Item -ItemType Directory -Force $srcDir | Out-Null
           foreach ($name in @("SourceSans3-Regular.otf","SourceSerif4-It.otf","SourceCodePro-Bold.otf","ABeeZee-Regular.ttf","ABeeZee-Italic.ttf","Abel-Regular.ttf","Aclonica-Regular.ttf")) { Copy-Item "test/$name" $srcDir }
+          python tools/strip_hr.py test/Aclonica-Regular.ttf "$srcDir/Aclonica-Regular.ttf" bare
           $dir = Join-Path (Resolve-Path test).Path "ui"
           New-Item -ItemType Directory -Force $dir | Out-Null
           $p = Start-Process -FilePath out/FontShelf.exe -ArgumentList @("--ui-test", "`"$srcDir`"", "`"$dir`"") -PassThru

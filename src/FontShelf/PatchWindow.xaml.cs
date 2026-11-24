@@ -92,9 +92,34 @@ namespace FontShelf
                     IncludeCheck.Visibility = Visibility.Visible;
                     SaveAllButton.Visibility = Visibility.Visible;
                 }
-                HeaderPanel.Margin = new Thickness(0, 0, 200, 0);
             }
+            Height = Math.Min(Height, SystemParameters.WorkArea.Height - 24);
+            Width = Math.Min(Width, SystemParameters.WorkArea.Width - 24);
+            Left = SystemParameters.WorkArea.Left + (SystemParameters.WorkArea.Width - Width) / 2;
+            Top = SystemParameters.WorkArea.Top + (SystemParameters.WorkArea.Height - Height) / 2;
             LoadFont();
+        }
+
+        private string _caronCh = "", _acuteCh = "";
+
+        private void ShowGlyphBoxes()
+        {
+            CaronGlyphText.Text = _caronCh; AcuteGlyphText.Text = _acuteCh;
+            CaronGlyphText.FontFamily = AcuteGlyphText.FontFamily = Font.Family;
+            CaronGlyphLabel.Text = _caronCh == "" ? "Automatski" : "Ručno: " + _caronCh;
+            AcuteGlyphLabel.Text = _acuteCh == "" ? "Automatski" : "Ručno: " + _acuteCh;
+        }
+
+        private void SetFace(GlyphTypeface face)
+        {
+            PreviewBig.Face = face; PreviewWords.Face = face; PreviewSmall.Face = face; PreviewCaps.Face = face;
+        }
+
+        private void ClearGlyph_Click(object sender, RoutedEventArgs e)
+        {
+            if ((string)((FrameworkElement)sender).Tag == "Caron") _caronCh = ""; else _acuteCh = "";
+            ShowGlyphBoxes();
+            if (_ready && !_loading) Regenerate();
         }
 
         // ------------------------------------------------------------ listanje fontova
@@ -108,7 +133,7 @@ namespace FontShelf
             BarWSlider.Value = s.BarW; BarTSlider.Value = s.BarT;
             OwnDCheck.IsChecked = s.OwnD;
             IncludeCheck.IsChecked = s.Include;
-            CaronBox.Text = s.CaronCh; AcuteBox.Text = s.AcuteCh;
+            _caronCh = s.CaronCh ?? ""; _acuteCh = s.AcuteCh ?? ""; ShowGlyphBoxes();
             CaronSSlider.Value = s.CaronS; AcuteSSlider.Value = s.AcuteS;
             CaronRSlider.Value = s.CaronR; AcuteRSlider.Value = s.AcuteR;
             CaronWSlider.Value = s.CaronW; AcuteWSlider.Value = s.AcuteW;
@@ -123,7 +148,7 @@ namespace FontShelf
             ControlsPanel.IsEnabled = true;
             s.Failed = false;
             InfoText.Foreground = (Brush)FindResource("SubTextBrush");
-            PreviewBig.FontFamily = PreviewSmall.FontFamily = PreviewCaps.FontFamily = Font.Family;
+            SetFace(null);
 
             _files = FontAnalyzer.AllFiles(Font).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             Diag.Log($"prozor: {Font.Name} [{Font.Key}] datoteke: {string.Join(" | ", _files)}");
@@ -150,7 +175,7 @@ namespace FontShelf
             s.BarW = BarWSlider.Value; s.BarT = BarTSlider.Value;
             s.OwnD = OwnDCheck.IsChecked == true;
             s.Include = IncludeCheck.IsChecked == true;
-            s.CaronCh = CaronBox.Text.Trim(); s.AcuteCh = AcuteBox.Text.Trim();
+            s.CaronCh = _caronCh; s.AcuteCh = _acuteCh;
             s.CaronS = CaronSSlider.Value; s.AcuteS = AcuteSSlider.Value;
             s.CaronR = CaronRSlider.Value; s.AcuteR = AcuteRSlider.Value;
             s.CaronW = CaronWSlider.Value; s.AcuteW = AcuteWSlider.Value;
@@ -164,15 +189,10 @@ namespace FontShelf
         {
             bool caron = (string)((FrameworkElement)sender).Tag == "Caron";
             var pick = new GlyphPickerWindow(Font, caron ? "Odaberi znak za kvačicu" : "Odaberi znak za akcent") { Owner = this };
-            if (pick.ShowDialog() == true && !string.IsNullOrEmpty(pick.Picked))
-                (caron ? CaronBox : AcuteBox).Text = pick.Picked;
-        }
-
-        private void Glyph_Changed(object sender, System.Windows.Controls.TextChangedEventArgs e)
-        {
-            if (!IsLoaded || !_ready || _loading) return;
-            _debounce.Stop();
-            _debounce.Start();
+            if (pick.ShowDialog() != true || string.IsNullOrEmpty(pick.Picked)) return;
+            if (caron) _caronCh = pick.Picked; else _acuteCh = pick.Picked;
+            ShowGlyphBoxes();
+            if (_ready && !_loading) Regenerate();
         }
 
         private void Go(int delta)
@@ -285,19 +305,16 @@ namespace FontShelf
                 Directory.CreateDirectory(dir);
                 var path = Path.Combine(dir, "preview" + r.Extension);
                 File.WriteAllBytes(path, r.Data);
-                var fam = GoogleFontsService.LoadFamilyFromFile(path);
-                if (fam != null)
-                {
-                    PreviewBig.FontFamily = fam;
-                    PreviewSmall.FontFamily = fam;
-                    PreviewCaps.FontFamily = fam;
-                }
+                SetFace(new GlyphTypeface(new Uri(path)));
 
                 Cur.Nothing = r.Added.Count == 0;
-                var added = r.Added.Count > 0 ? "Dodaju se: " + string.Join(" ", r.Added) : "Font već ima sve hrvatske znakove.";
-                var skipped = r.Skipped.Count > 0 ? "\nNije moguće dodati: " + string.Join(", ", r.Skipped) : "";
-                if (r.Skipped.Any(x => x.Contains("nema kvačice") || x.Contains("nema akcenta")))
-                    skipped += "\nFont nema gotovu kvačicu/akcent — upiši zamjenski znak u „Ručni odabir znaka”.";
+                var added = r.Added.Count > 0 ? "Dodaju se: " + string.Join(" ", r.Added)
+                    : r.Skipped.Count > 0 ? "Zasad se ništa ne dodaje." : "Font već ima sve hrvatske znakove.";
+                var skipped = "";
+                if (r.Skipped.Any(x => x.Contains("nema kvačice"))) skipped += "\nFont nema kvačicu — pod „Kvačica” odaberi zamjenski znak (npr. v).";
+                if (r.Skipped.Any(x => x.Contains("nema akcenta"))) skipped += "\nFont nema akcent — pod „Akcent” odaberi zamjenski znak (npr. I, l ili /) i zakreni ga.";
+                var other = r.Skipped.Where(x => !x.Contains("nema kvačice") && !x.Contains("nema akcenta")).ToList();
+                if (other.Count > 0) skipped += "\nNije moguće dodati: " + string.Join(", ", other);
                 if (Cur.Saved) added = "✓ Spremljeno. " + added;
                 var styles = r.Added.Count == 0 ? ""
                     : _files.Count > 1 ? $"\nSprema se {_files.Count} {Plural.Of(_files.Count, "stil", "stila", "stilova")}, kao „{r.NewFamily}”."
@@ -328,7 +345,7 @@ namespace FontShelf
             BarYSlider.Value = 0; BarYUSlider.Value = 0; BarXSlider.Value = 0;
             BarWSlider.Value = 1; BarTSlider.Value = 1;
             OwnDCheck.IsChecked = false;
-            CaronBox.Text = ""; AcuteBox.Text = "";
+            _caronCh = ""; _acuteCh = ""; ShowGlyphBoxes();
             CaronSSlider.Value = 1; AcuteSSlider.Value = 1; CaronRSlider.Value = 0; AcuteRSlider.Value = 0;
             CaronWSlider.Value = 1; AcuteWSlider.Value = 1; CaronTSlider.Value = 0; AcuteTSlider.Value = 0;
             CaronFlipCheck.IsChecked = false; AcuteFlipCheck.IsChecked = false;
@@ -467,8 +484,9 @@ namespace FontShelf
         public void SetManualForTest(string caron, double cs, double cr, string acute, double asc, double ar)
         {
             CaronWSlider.Value = 1.4; CaronTSlider.Value = 0.03; AcuteWSlider.Value = 0.8; AcuteTSlider.Value = 0.02;
-            CaronBox.Text = caron; CaronSSlider.Value = cs; CaronRSlider.Value = cr;
-            AcuteBox.Text = acute; AcuteSSlider.Value = asc; AcuteRSlider.Value = ar;
+            _caronCh = caron; CaronSSlider.Value = cs; CaronRSlider.Value = cr;
+            _acuteCh = acute; AcuteSSlider.Value = asc; AcuteRSlider.Value = ar;
+            ShowGlyphBoxes();
         }
     }
 }

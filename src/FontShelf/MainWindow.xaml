@@ -1134,19 +1134,13 @@
                                 <StackPanel Margin="32,0,28,32">
                                     <Border Background="{DynamicResource CardBrush}" CornerRadius="12" Padding="16,14" Margin="0,24,0,0"
                                             Visibility="{Binding SelectedFont.MissingCroatian, Converter={StaticResource BoolVis}}">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                                                <TextBlock Text="Nedostaju hrvatski znakovi" FontWeight="SemiBold"/>
-                                                <TextBlock Text="Napravi kopiju fonta s č ć đ š ž" Foreground="{DynamicResource SubTextBrush}"
-                                                           FontSize="12" Margin="0,3,0,0" TextWrapping="Wrap"/>
-                                            </StackPanel>
-                                            <Button Grid.Column="1" Style="{StaticResource AccentButton}" Content="Dodaj čćđšž"
-                                                    Height="34" Padding="14,0" Margin="0" VerticalAlignment="Center" Click="AddCroatian_Click"/>
-                                        </Grid>
+                                        <StackPanel>
+                                            <TextBlock Text="Nedostaju hrvatski znakovi" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                            <TextBlock Text="Napravi kopiju fonta s č ć đ š ž" Foreground="{DynamicResource SubTextBrush}"
+                                                       FontSize="12" Margin="0,3,0,10" TextWrapping="Wrap"/>
+                                            <Button Style="{StaticResource AccentButton}" Content="Dodaj čćđšž" HorizontalAlignment="Left"
+                                                    Height="34" Padding="16,0" Margin="0" Click="AddCroatian_Click"/>
+                                        </StackPanel>
                                     </Border>
                                     <TextBlock Text="Tagovi" Style="{StaticResource DetailTitle}" Margin="0,28,0,12"/>
                                     <ItemsControl ItemsSource="{Binding SelectedFont.Tags}">

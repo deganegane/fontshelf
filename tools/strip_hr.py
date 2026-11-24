@@ -11,6 +11,12 @@ if "noeth" in extra:
     cps += [0x00D0]
 f = TTFont(src)
 for t in f["cmap"].tables:
+    if "bare" in extra:
+        # ostavi samo slova A-Z, a-z i razmak (font bez interpunkcije i akcenata)
+        for cp in list(t.cmap):
+            if not (cp == 32 or 65 <= cp <= 90 or 97 <= cp <= 122):
+                del t.cmap[cp]
+        continue
     for cp in cps:
         t.cmap.pop(cp, None)
 f.save(dst)

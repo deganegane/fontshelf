@@ -96,7 +96,7 @@ namespace FontShelf
                         }
                         if (pass == 1 && n % 2 == 0)
                         {
-                            w.SetManualForTest("v", 0.5, 0, "/", 0.45, -15);
+                            w.SetManualForTest("v", 1.0, 0, "l", 1.0, -30);
                             await Task.Delay(450);
                             Diag.Log("  ručni znak: " + w.InfoText.Text.Replace("\n", " / "));
                         }

@@ -599,6 +599,12 @@ namespace FontShelf.Services
                 else { accG = circG; flipV = !flipV; }
                 if (accG <= 0) return (-1, 0, 0, 0, ac ? "nema akcenta ´" : "nema kvačice ˇ ni ˆ");
 
+                if (manual > 0)
+                {
+                    // ručno odabran znak (npr. slovo v) svedi na uobičajenu veličinu kvačice/akcenta
+                    var mb = Box(accG);
+                    if (mb.H > 0) scale *= (ac ? 0.42 : 0.34) * xHeight / mb.H;
+                }
                 double f = flipV ? -1 : 1;
                 double a11 = scale * wide * Math.Cos(rot), a12 = -scale * f * Math.Sin(rot);
                 double a21 = scale * wide * Math.Sin(rot), a22 = scale * f * Math.Cos(rot);
@@ -671,9 +677,10 @@ namespace FontShelf.Services
                         res.Added.Add(label);
                         continue;
                     }
-                    if (hyphenG <= 0) { res.Skipped.Add(label + " (nema crtice)"); continue; }
-                    var hb = Box(hyphenG);
-                    if (hb.W <= 0 || hb.H <= 0) { res.Skipped.Add(label + " (neispravna crtica)"); continue; }
+                    // ako font nema crticu (-), crtica se nacrta kao pravokutnik
+                    var hb0 = hyphenG > 0 ? Box(hyphenG) : new BBox { Empty = true };
+                    bool synth = hb0.Empty || hb0.W <= 0 || hb0.H <= 0;
+                    double hbW = hb0.W, hbH = hb0.H, hbCX = hb0.CX, hbCY = hb0.CY;
 
                     double cy = upper ? capHeight * 0.5 : xHeight + (bb.YMax - xHeight) * 0.52;
                     cy += upper ? o.BarShiftYUpper : o.BarShiftY;
@@ -691,7 +698,7 @@ namespace FontShelf.Services
                     }
                     if (double.IsNaN(stemA))
                     {
-                        double sw = Math.Max(hb.H * 1.2, upem * 0.07);
+                        double sw = synth ? upem * 0.07 : Math.Max(hbH * 1.2, upem * 0.07);
                         if (upper) { stemA = bb.XMin; stemB = bb.XMin + sw; }
                         else { stemA = bb.XMax - sw; stemB = bb.XMax; }
                     }
@@ -700,15 +707,16 @@ namespace FontShelf.Services
                     double width = (upper ? Math.Max(stemW * 2.2, upem * 0.16) : Math.Max(stemW * 2.6, upem * 0.2)) * o.BarWidthScale;
                     double cx = upper ? stemC + stemW * 0.35 : stemC - stemW * 0.15;
                     cx += o.BarShiftX;
-                    double sx = Math.Min(1.99, Math.Max(0.05, width / hb.W));
+                    if (synth) { hbW = width; hbH = Math.Max(stemW * 0.7, upem * 0.025); hbCX = hbW / 2; hbCY = hbH / 2; }
+                    double sx = Math.Min(1.99, Math.Max(0.05, width / hbW));
                     double sy = Math.Min(1.99, Math.Max(0.2, o.BarThicknessScale));
-                    int dx = (int)Math.Round(cx - hb.CX * sx);
-                    int dy = (int)Math.Round(cy - hb.CY * sy);
+                    int dx = (int)Math.Round(cx - hbCX * sx);
+                    int dy = (int)Math.Round(cy - hbCY * sy);
                     if (isCff)
                     {
                         // Windows u CFF fontovima preklapanje obrisa crta kao rupu, pa se crtica
                         // slaže od dijelova lijevo i desno od slova, bez preklapanja.
-                        double bw = hb.W * sx, bh = hb.H * sy;
+                        double bw = hbW * sx, bh = hbH * sy;
                         double x0 = cx - bw / 2, x1 = cx + bw / 2, yb = cy - bh / 2, yt = cy + bh / 2;
                         List<(double a, double b)> Free(double y)
                         {
@@ -733,6 +741,15 @@ namespace FontShelf.Services
                             if (fb[i].b - fb[i].a < 2 && ft[i].b - ft[i].a < 2) continue;
                             barPolys.Add(new List<(double, double)> { (fb[i].a, yb), (fb[i].b, yb), (ft[i].b, yt), (ft[i].a, yt) });
                         }
+                    }
+                    else if (synth)
+                    {
+                        int x0 = (int)Math.Round(cx - hbW * sx / 2), x1 = (int)Math.Round(cx + hbW * sx / 2);
+                        int y0 = (int)Math.Round(cy - hbH * sy / 2), y1 = (int)Math.Round(cy + hbH * sy / 2);
+                        glyphs.Add(WriteSimple(new List<List<(int x, int y, bool on)>>
+                            { new List<(int, int, bool)> { (x0, y0, true), (x0, y1, true), (x1, y1, true), (x1, y0, true) } }));
+                        adv.Add(adv[baseG]); lsb.Add(x0); newNames.Add("bar.hr" + newNames.Count);
+                        comps.Add((glyphs.Count - 1, 0, 0, 1, 1, false, 0, 0));
                     }
                     else comps.Add((hyphenG, dx, dy, sx, sy, false, 0, 0));
                 }
