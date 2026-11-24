@@ -593,6 +593,7 @@ namespace FontShelf.Services
                 {
                     (baseG, 0, 0, 1, 1, true)
                 };
+                List<List<(double x, double y)>> barPolys = null;
 
                 if (kind == Kind.Bar)
                 {
@@ -635,7 +636,37 @@ namespace FontShelf.Services
                     double sy = Math.Min(1.99, Math.Max(0.2, o.BarThicknessScale));
                     int dx = (int)Math.Round(cx - hb.CX * sx);
                     int dy = (int)Math.Round(cy - hb.CY * sy);
-                    comps.Add((hyphenG, dx, dy, sx, sy, false));
+                    if (isCff)
+                    {
+                        // Windows u CFF fontovima preklapanje obrisa crta kao rupu, pa se crtica
+                        // slaže od dijelova lijevo i desno od slova, bez preklapanja.
+                        double bw = hb.W * sx, bh = hb.H * sy;
+                        double x0 = cx - bw / 2, x1 = cx + bw / 2, yb = cy - bh / 2, yt = cy + bh / 2;
+                        List<(double a, double b)> Free(double y)
+                        {
+                            var free = new List<(double, double)>();
+                            double cur = x0;
+                            if (poly != null)
+                                foreach (var sp in Spans(poly, y).OrderBy(q => q.a))
+                                {
+                                    if (sp.b <= cur) continue;
+                                    if (sp.a >= x1) break;
+                                    if (sp.a > cur) free.Add((cur, Math.Min(sp.a, x1)));
+                                    cur = Math.Max(cur, sp.b);
+                                }
+                            if (cur < x1) free.Add((cur, x1));
+                            return free;
+                        }
+                        var fb = Free(yb); var ft = Free(yt);
+                        if (fb.Count != ft.Count) { fb = Free(cy); ft = fb; }
+                        barPolys = new List<List<(double x, double y)>>();
+                        for (int i = 0; i < fb.Count; i++)
+                        {
+                            if (fb[i].b - fb[i].a < 2 && ft[i].b - ft[i].a < 2) continue;
+                            barPolys.Add(new List<(double, double)> { (fb[i].a, yb), (fb[i].b, yb), (ft[i].b, yt), (ft[i].a, yt) });
+                        }
+                    }
+                    else comps.Add((hyphenG, dx, dy, sx, sy, false));
                 }
                 else if (GetAccent(kind, upper) is AccentSrc src)
                 {
@@ -671,7 +702,7 @@ namespace FontShelf.Services
                 int ng;
                 if (isCff)
                 {
-                    ng = cff.AddComposite(comps, adv[baseG], gname);
+                    ng = cff.AddComposite(comps, adv[baseG], gname, barPolys);
                     var nb = cff.Box(ng);
                     lsb.Add(nb.Empty ? 0 : nb.XMin);
                 }

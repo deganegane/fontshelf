@@ -530,7 +530,8 @@ namespace FontShelf.Services
             }
 
             /// <summary>Doda glif spojen od transformiranih obrisa drugih glifova. Vraća novi gid.</summary>
-            public int AddComposite(List<(int gid, int dx, int dy, double sx, double sy, bool metrics)> comps, int advance, string name)
+            public int AddComposite(List<(int gid, int dx, int dy, double sx, double sy, bool metrics)> comps, int advance, string name,
+                List<List<(double x, double y)>> extra = null)
             {
                 int baseGid = comps[0].gid;
                 var list = new List<Contour>();
@@ -552,6 +553,14 @@ namespace FontShelf.Services
                     }
                 }
 
+                if (extra != null)
+                    foreach (var poly in extra)
+                    {
+                        if (poly.Count < 3) continue;
+                        var nc = new Contour { SX = poly[0].x, SY = poly[0].y };
+                        for (int i = 1; i < poly.Count; i++) nc.Segs.Add(new Seg { X = poly[i].x, Y = poly[i].y });
+                        list.Add(nc);
+                    }
                 return AddContours(list, _fdSelect[baseGid], advance, name);
             }
 
