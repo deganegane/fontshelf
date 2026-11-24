@@ -94,6 +94,7 @@ namespace FontShelf
                     SaveAllButton.Visibility = Visibility.Visible;
                 }
             }
+            ZoomSlider.Value = _zoom;
             Height = Math.Min(Height, SystemParameters.WorkArea.Height - 24);
             Width = Math.Min(Width, SystemParameters.WorkArea.Width - 24);
             Left = SystemParameters.WorkArea.Left + (SystemParameters.WorkArea.Width - Width) / 2;
@@ -139,6 +140,17 @@ namespace FontShelf
             CaronGlyphText.FontFamily = AcuteGlyphText.FontFamily = Font.Family;
             CaronGlyphLabel.Text = _caronCh == "" ? "Automatski" : "Ručno: " + _caronCh;
             AcuteGlyphLabel.Text = _acuteCh == "" ? "Automatski" : "Ručno: " + _acuteCh;
+        }
+
+        private static double _zoom = 1;   // pamti se dok je aplikacija otvorena
+
+        private void Zoom_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (PreviewBig == null || PreviewCaps == null || ZoomVal == null) return;
+            _zoom = ZoomSlider.Value;
+            PreviewBig.FontSize = 84 * _zoom; PreviewWords.FontSize = 40 * _zoom;
+            PreviewSmall.FontSize = 26 * _zoom; PreviewCaps.FontSize = 26 * _zoom;
+            ZoomVal.Text = $"{_zoom * 100:0}%";
         }
 
         private void SetFace(GlyphTypeface face)

@@ -49,7 +49,14 @@
 
         <!-- pregled -->
         <Border Grid.Row="1" Margin="0,18,24,0" Background="{DynamicResource CardBrush}" CornerRadius="14" Padding="28,20">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <DockPanel>
+            <Grid DockPanel.Dock="Bottom" Margin="0,12,0,0">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="52"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Veličina prikaza" VerticalAlignment="Center" Margin="0,0,14,0" Foreground="{DynamicResource SubTextBrush}"/>
+                <Slider x:Name="ZoomSlider" Grid.Column="1" Minimum="0.4" Maximum="4" Value="1" IsMoveToPointEnabled="True" ValueChanged="Zoom_Changed"/>
+                <TextBlock x:Name="ZoomVal" Grid.Column="2" Text="100%" Style="{StaticResource RowValue}"/>
+            </Grid>
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel>
                     <local:GlyphPreview x:Name="PreviewBig" Text="čćšžđ ČĆŠŽĐ" FontSize="84"/>
                     <local:GlyphPreview x:Name="PreviewWords" Text="Čakovec Đakovo Šibenik Žminj Ćićarija" FontSize="40" Margin="0,6,0,0"/>
@@ -60,6 +67,7 @@
                                Text="Pregled koristi samo znakove ovog fonta. Narančasti okvir znači da znak još ne postoji."/>
                 </StackPanel>
             </ScrollViewer>
+            </DockPanel>
         </Border>
 
         <!-- postavke -->
