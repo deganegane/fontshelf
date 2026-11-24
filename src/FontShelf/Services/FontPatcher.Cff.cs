@@ -564,6 +564,49 @@ namespace FontShelf.Services
                 return AddContours(list, _fdSelect[baseGid], advance, name);
             }
 
+            /// <summary>Sve točke glifa po konturama: početak, pa za svaki odsječak kraj (ravni) ili c1, c2, kraj (krivulja).</summary>
+            public List<List<(double x, double y)>> RawPoints(int gid)
+            {
+                if (gid < 0 || gid >= Count) return null;
+                var o = Outlines(gid);
+                if (o.Count == 0) return null;
+                return o.Select(c =>
+                {
+                    var l = new List<(double, double)> { (c.SX, c.SY) };
+                    foreach (var s in c.Segs)
+                    {
+                        if (s.Curve) { l.Add((s.X1, s.Y1)); l.Add((s.X2, s.Y2)); }
+                        l.Add((s.X, s.Y));
+                    }
+                    return l;
+                }).ToList();
+            }
+
+            /// <summary>Doda glif iste građe kao predložak, ali s novim položajima točaka (iz RawPoints).</summary>
+            public int AddFromRaw(int template, List<List<(double x, double y)>> pts, int advance, string name)
+            {
+                var o = Outlines(template);
+                var list = new List<Contour>();
+                for (int ci = 0; ci < o.Count && ci < pts.Count; ci++)
+                {
+                    var p = pts[ci];
+                    int k = 0;
+                    var nc = new Contour { SX = p[k].x, SY = p[k].y };
+                    k++;
+                    foreach (var s in o[ci].Segs)
+                    {
+                        if (s.Curve)
+                        {
+                            nc.Segs.Add(new Seg { Curve = true, X1 = p[k].x, Y1 = p[k].y, X2 = p[k + 1].x, Y2 = p[k + 1].y, X = p[k + 2].x, Y = p[k + 2].y });
+                            k += 3;
+                        }
+                        else { nc.Segs.Add(new Seg { X = p[k].x, Y = p[k].y }); k++; }
+                    }
+                    list.Add(nc);
+                }
+                return AddContours(list, _fdSelect[template], advance, name);
+            }
+
             /// <summary>Doda glif od odabranih kontura postojećeg glifa (npr. samo akcent iz é).</summary>
             public int AddSubset(int gid, List<int> keep, int advance, string name)
             {

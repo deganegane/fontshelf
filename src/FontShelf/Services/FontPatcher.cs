@@ -25,6 +25,11 @@ namespace FontShelf.Services
         public double AcuteScale { get; set; } = 1.0;
         public double AcuteRotate { get; set; }
         public bool AcuteFlip { get; set; }
+        // širina (rastezanje, 1 = bez promjene) i podebljanje (jedinice fonta, + deblje, − tanje)
+        public double CaronWidth { get; set; } = 1.0;
+        public double CaronThickness { get; set; }
+        public double AcuteWidth { get; set; } = 1.0;
+        public double AcuteThickness { get; set; }
         public string Suffix { get; set; } = "HR";
         public bool Rename { get; set; } = true;
     }
@@ -572,6 +577,60 @@ namespace FontShelf.Services
                 return null;
             }
 
+            var baked = new Dictionary<Kind, (int gid, double xMin, double xMax, double yMin, string err)>();
+            (int gid, double xMin, double xMax, double yMin, string err) Bake(Kind kind)
+            {
+                bool ac = kind == Kind.Acute;
+                int manual = ac ? o.AcuteGlyph : o.CaronGlyph;
+                double scale = Math.Max(0.05, Math.Min(4, ac ? o.AcuteScale : o.CaronScale));
+                double wide = Math.Max(0.1, Math.Min(5, ac ? o.AcuteWidth : o.CaronWidth));
+                double rot = (ac ? o.AcuteRotate : o.CaronRotate) * Math.PI / 180.0;
+                double thick = ac ? o.AcuteThickness : o.CaronThickness;
+                bool flipV = ac ? o.AcuteFlip : o.CaronFlip;
+                int accG;
+                if (manual > 0)
+                {
+                    accG = Gid(manual);
+                    if (accG <= 0 || Box(accG).Empty) return (-1, 0, 0, 0, "font nema znak " + char.ConvertFromUtf32(manual));
+                }
+                else if (GetAccent(kind, false) is AccentSrc auto) accG = auto.Gid;
+                else if (ac) accG = acuteG;
+                else if (caronG > 0) accG = caronG;
+                else { accG = circG; flipV = !flipV; }
+                if (accG <= 0) return (-1, 0, 0, 0, ac ? "nema akcenta ´" : "nema kvačice ˇ ni ˆ");
+
+                double f = flipV ? -1 : 1;
+                double a11 = scale * wide * Math.Cos(rot), a12 = -scale * f * Math.Sin(rot);
+                double a21 = scale * wide * Math.Sin(rot), a22 = scale * f * Math.Cos(rot);
+                List<List<(double x, double y)>> pts;
+                List<List<(int x, int y, bool on)>> tt = null;
+                if (isCff) pts = cff.RawPoints(accG);
+                else
+                {
+                    tt = ParsePoints(glyphs[accG]);
+                    pts = tt?.Select(c => c.Select(q => ((double)q.x, (double)q.y)).ToList()).ToList();
+                }
+                if (pts == null || pts.Count == 0) return (-1, 0, 0, 0, "odabrani znak je složen od drugih znakova — odaberi neki drugi");
+                pts = pts.Select(c => c.Select(q => (a11 * q.x + a12 * q.y, a21 * q.x + a22 * q.y)).ToList()).ToList();
+                if (Math.Abs(thick) > 0.01) pts = Embolden(pts, thick / 2);
+                var all = pts.SelectMany(c => c).ToList();
+                int gidNew;
+                string nm = ac ? "acute.hr" + newNames.Count : "caron.hr" + newNames.Count;
+                if (isCff) gidNew = cff.AddFromRaw(accG, pts, adv[accG], nm);
+                else
+                {
+                    var outc = new List<List<(int x, int y, bool on)>>();
+                    for (int ci = 0; ci < pts.Count; ci++)
+                        outc.Add(pts[ci].Select((q, i) => ((int)Math.Round(q.x), (int)Math.Round(q.y), tt[ci][i].on)).ToList());
+                    glyphs.Add(WriteSimple(outc));
+                    gidNew = glyphs.Count - 1;
+                }
+                adv.Add(adv[accG]);
+                lsb.Add((int)Math.Floor(all.Min(q => q.x)));
+                newNames.Add(nm);
+                return (gidNew, all.Min(q => q.x), all.Max(q => q.x), all.Min(q => q.y), null);
+            }
+
             var accentCache = new Dictionary<(Kind, bool), AccentSrc>();
             AccentSrc GetAccent(Kind k, bool up)
             {
@@ -679,35 +738,12 @@ namespace FontShelf.Services
                 }
                 else if (Custom(kind, o))
                 {
-                    // ručno odabran znak ili promijenjena veličina/zakret: akcent se slaže iznad slova
-                    bool ac = kind == Kind.Acute;
-                    int manual = ac ? o.AcuteGlyph : o.CaronGlyph;
-                    double scale = Math.Max(0.05, Math.Min(1.9, ac ? o.AcuteScale : o.CaronScale));
-                    double rot = (ac ? o.AcuteRotate : o.CaronRotate) * Math.PI / 180.0;
-                    bool flipV = ac ? o.AcuteFlip : o.CaronFlip;
-                    int accG;
-                    if (manual > 0)
-                    {
-                        accG = Gid(manual);
-                        if (accG <= 0 || Box(accG).Empty) { res.Skipped.Add(label + " (font nema znak " + char.ConvertFromUtf32(manual) + ")"); continue; }
-                    }
-                    else if (GetAccent(kind, false) is AccentSrc auto) accG = auto.Gid;
-                    else if (ac) accG = acuteG;
-                    else if (caronG > 0) accG = caronG;
-                    else { accG = circG; flipV = !flipV; }
-                    if (accG <= 0) { res.Skipped.Add(label + (ac ? " (nema akcenta ´)" : " (nema kvačice ˇ ni ˆ)")); continue; }
-                    double f = flipV ? -1 : 1;
-                    double a11 = scale * Math.Cos(rot), a12 = -scale * f * Math.Sin(rot);
-                    double a21 = scale * Math.Sin(rot), a22 = scale * f * Math.Cos(rot);
-                    var ab = Box(accG);
-                    var pts = Poly(accG)?.SelectMany(q => q).ToList();
-                    if (pts == null || pts.Count == 0)
-                        pts = new List<(double x, double y)> { (ab.XMin, ab.YMin), (ab.XMax, ab.YMin), (ab.XMax, ab.YMax), (ab.XMin, ab.YMax) };
-                    var tp = pts.Select(q => (x: a11 * q.x + a12 * q.y, y: a21 * q.x + a22 * q.y)).ToList();
-                    double txMin = tp.Min(q => q.x), txMax = tp.Max(q => q.x), tyMin = tp.Min(q => q.y);
-                    double dy = bb.YMax + minGap - tyMin;
-                    double dx = bb.CX - (txMin + txMax) / 2 + slant * (bb.YMax + minGap - bb.YMax / 2.0) + o.AccentShiftX;
-                    comps.Add((accG, (int)Math.Round(dx), (int)Math.Round(dy), a11, a22, false, a21, a12));
+                    // ručno odabran znak ili promijenjen oblik: napravi se poseban glif akcenta i složi iznad slova
+                    if (!baked.TryGetValue(kind, out var bk)) baked[kind] = bk = Bake(kind);
+                    if (bk.gid < 0) { res.Skipped.Add(label + " (" + bk.err + ")"); continue; }
+                    double dy = bb.YMax + minGap - bk.yMin;
+                    double dx = bb.CX - (bk.xMin + bk.xMax) / 2 + slant * (minGap + bb.YMax / 2.0) + o.AccentShiftX;
+                    comps.Add((bk.gid, (int)Math.Round(dx), (int)Math.Round(dy), 1, 1, false, 0, 0));
                 }
                 else if (GetAccent(kind, upper) is AccentSrc src)
                 {
@@ -850,7 +886,117 @@ namespace FontShelf.Services
 
         private static bool Custom(Kind k, PatchOptions o) => k == Kind.Acute
             ? o.AcuteGlyph > 0 || Math.Abs(o.AcuteScale - 1) > 1e-6 || Math.Abs(o.AcuteRotate) > 1e-6 || o.AcuteFlip
-            : k == Kind.Caron && (o.CaronGlyph > 0 || Math.Abs(o.CaronScale - 1) > 1e-6 || Math.Abs(o.CaronRotate) > 1e-6 || o.CaronFlip);
+              || Math.Abs(o.AcuteWidth - 1) > 1e-6 || Math.Abs(o.AcuteThickness) > 0.01
+            : k == Kind.Caron && (o.CaronGlyph > 0 || Math.Abs(o.CaronScale - 1) > 1e-6 || Math.Abs(o.CaronRotate) > 1e-6 || o.CaronFlip
+              || Math.Abs(o.CaronWidth - 1) > 1e-6 || Math.Abs(o.CaronThickness) > 0.01);
+
+        /// <summary>Točke jednostavnog TrueType glifa po konturama (null za složene ili prazne).</summary>
+        private static List<List<(int x, int y, bool on)>> ParsePoints(byte[] g)
+        {
+            if (g == null || g.Length < 10) return null;
+            int nc = I16(g, 0);
+            if (nc <= 0) return null;
+            var ends = new int[nc];
+            for (int i = 0; i < nc; i++) ends[i] = U16(g, 10 + 2 * i);
+            int np = ends[nc - 1] + 1;
+            int p = 10 + 2 * nc;
+            p += 2 + U16(g, p);
+            var flags = new byte[np];
+            for (int i = 0; i < np;)
+            {
+                byte f = g[p++];
+                flags[i++] = f;
+                if ((f & 8) != 0) { int rp = g[p++]; for (int k = 0; k < rp && i < np; k++) flags[i++] = f; }
+            }
+            var xs = new int[np]; var ys = new int[np];
+            int v = 0;
+            for (int i = 0; i < np; i++)
+            {
+                byte f = flags[i];
+                if ((f & 2) != 0) { int dv = g[p++]; v += (f & 16) != 0 ? dv : -dv; }
+                else if ((f & 16) == 0) { v += I16(g, p); p += 2; }
+                xs[i] = v;
+            }
+            v = 0;
+            for (int i = 0; i < np; i++)
+            {
+                byte f = flags[i];
+                if ((f & 4) != 0) { int dv = g[p++]; v += (f & 32) != 0 ? dv : -dv; }
+                else if ((f & 32) == 0) { v += I16(g, p); p += 2; }
+                ys[i] = v;
+            }
+            var res = new List<List<(int, int, bool)>>();
+            int start = 0;
+            for (int c = 0; c < nc; c++)
+            {
+                var l = new List<(int, int, bool)>();
+                for (int i = start; i <= ends[c]; i++) l.Add((xs[i], ys[i], (flags[i] & 1) != 0));
+                if (l.Count > 0) res.Add(l);
+                start = ends[c] + 1;
+            }
+            return res.Count == 0 ? null : res;
+        }
+
+        /// <summary>Jednostavan TrueType glif iz točaka (bez instrukcija).</summary>
+        private static byte[] WriteSimple(List<List<(int x, int y, bool on)>> contours)
+        {
+            int C(int v) => Math.Max(-32768, Math.Min(32767, v));
+            var pts = contours.SelectMany(c => c).Select(q => (x: C(q.x), y: C(q.y), q.on)).ToList();
+            var b = new Buf();
+            b.U16(contours.Count);
+            b.U16(pts.Min(q => q.x) & 0xFFFF); b.U16(pts.Min(q => q.y) & 0xFFFF);
+            b.U16(pts.Max(q => q.x) & 0xFFFF); b.U16(pts.Max(q => q.y) & 0xFFFF);
+            int e = -1;
+            foreach (var c in contours) { e += c.Count; b.U16(e); }
+            b.U16(0);
+            foreach (var q in pts) b.U8(q.on ? 1 : 0);
+            int lx = 0, ly = 0;
+            foreach (var q in pts) { b.U16((q.x - lx) & 0xFFFF); lx = q.x; }
+            foreach (var q in pts) { b.U16((q.y - ly) & 0xFFFF); ly = q.y; }
+            return b.ToArray();
+        }
+
+        /// <summary>Podeblja (d &gt; 0) ili stanji (d &lt; 0) obris pomicanjem točaka po okomici za d jedinica.</summary>
+        private static List<List<(double x, double y)>> Embolden(List<List<(double x, double y)>> contours, double d)
+        {
+            double Area(List<(double x, double y)> c)
+            {
+                double a = 0;
+                for (int i = 0; i < c.Count; i++) { var p = c[i]; var q = c[(i + 1) % c.Count]; a += p.x * q.y - q.x * p.y; }
+                return a / 2;
+            }
+            // najveća kontura je vanjska; njezin smjer određuje gdje je "van"
+            double big = 0;
+            foreach (var c in contours) { var a = Area(c); if (Math.Abs(a) > Math.Abs(big)) big = a; }
+            double sign = big >= 0 ? 1 : -1;
+            var res = new List<List<(double, double)>>();
+            foreach (var c in contours)
+            {
+                int n = c.Count;
+                var o = new List<(double, double)>(n);
+                for (int i = 0; i < n; i++)
+                {
+                    var cur = c[i];
+                    (double x, double y) prev = cur, next = cur;
+                    for (int k = 1; k < n; k++) { var t = c[(i - k + n) % n]; if (Math.Abs(t.x - cur.x) + Math.Abs(t.y - cur.y) > 0.01) { prev = t; break; } }
+                    for (int k = 1; k < n; k++) { var t = c[(i + k) % n]; if (Math.Abs(t.x - cur.x) + Math.Abs(t.y - cur.y) > 0.01) { next = t; break; } }
+                    double d1x = cur.x - prev.x, d1y = cur.y - prev.y, d2x = next.x - cur.x, d2y = next.y - cur.y;
+                    double l1 = Math.Sqrt(d1x * d1x + d1y * d1y), l2 = Math.Sqrt(d2x * d2x + d2y * d2y);
+                    if (l1 < 1e-6 || l2 < 1e-6) { o.Add(cur); continue; }
+                    d1x /= l1; d1y /= l1; d2x /= l2; d2y /= l2;
+                    // vanjska okomica za konturu suprotnu od kazaljke: (dy, -dx)
+                    double nx = (d1y + d2y) * sign, ny = -(d1x + d2x) * sign;
+                    double nl = Math.Sqrt(nx * nx + ny * ny);
+                    if (nl < 1e-6) { o.Add(cur); continue; }
+                    nx /= nl; ny /= nl;
+                    double cosHalf = Math.Sqrt(Math.Max(0, (1 + d1x * d2x + d1y * d2y) / 2));
+                    double miter = 1 / Math.Max(0.5, cosHalf);
+                    o.Add((cur.x + nx * d * miter, cur.y + ny * d * miter));
+                }
+                res.Add(o);
+            }
+            return res;
+        }
 
         private static byte[] BuildComposite(List<byte[]> glyphs, List<(int gid, int dx, int dy, double sx, double sy, bool metrics, double m01, double m10)> comps)
         {

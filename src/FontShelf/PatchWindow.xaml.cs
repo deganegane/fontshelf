@@ -26,7 +26,7 @@ namespace FontShelf
             public double BarW = 1, BarT = 1;
             public bool OwnD;
             public string CaronCh = "", AcuteCh = "";
-            public double CaronS = 1, AcuteS = 1, CaronR, AcuteR;
+            public double CaronS = 1, AcuteS = 1, CaronR, AcuteR, CaronW = 1, AcuteW = 1, CaronT, AcuteT;
             public bool CaronFlip, AcuteFlip;
             public bool Saved;
             public bool Include = true;
@@ -111,6 +111,8 @@ namespace FontShelf
             CaronBox.Text = s.CaronCh; AcuteBox.Text = s.AcuteCh;
             CaronSSlider.Value = s.CaronS; AcuteSSlider.Value = s.AcuteS;
             CaronRSlider.Value = s.CaronR; AcuteRSlider.Value = s.AcuteR;
+            CaronWSlider.Value = s.CaronW; AcuteWSlider.Value = s.AcuteW;
+            CaronTSlider.Value = s.CaronT; AcuteTSlider.Value = s.AcuteT;
             CaronFlipCheck.IsChecked = s.CaronFlip; AcuteFlipCheck.IsChecked = s.AcuteFlip;
             _loading = false;
 
@@ -151,10 +153,20 @@ namespace FontShelf
             s.CaronCh = CaronBox.Text.Trim(); s.AcuteCh = AcuteBox.Text.Trim();
             s.CaronS = CaronSSlider.Value; s.AcuteS = AcuteSSlider.Value;
             s.CaronR = CaronRSlider.Value; s.AcuteR = AcuteRSlider.Value;
+            s.CaronW = CaronWSlider.Value; s.AcuteW = AcuteWSlider.Value;
+            s.CaronT = CaronTSlider.Value; s.AcuteT = AcuteTSlider.Value;
             s.CaronFlip = CaronFlipCheck.IsChecked == true; s.AcuteFlip = AcuteFlipCheck.IsChecked == true;
         }
 
         private static int FirstCp(string t) => string.IsNullOrEmpty(t) ? 0 : char.ConvertToUtf32(t, 0);
+
+        private void PickGlyph_Click(object sender, RoutedEventArgs e)
+        {
+            bool caron = (string)((FrameworkElement)sender).Tag == "Caron";
+            var pick = new GlyphPickerWindow(Font, caron ? "Odaberi znak za kvačicu" : "Odaberi znak za akcent") { Owner = this };
+            if (pick.ShowDialog() == true && !string.IsNullOrEmpty(pick.Picked))
+                (caron ? CaronBox : AcuteBox).Text = pick.Picked;
+        }
 
         private void Glyph_Changed(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
@@ -206,7 +218,9 @@ namespace FontShelf
             BarThicknessScale = s.BarT,
             UseEth = !s.OwnD,
             CaronGlyph = SafeCp(s.CaronCh), CaronScale = s.CaronS, CaronRotate = s.CaronR, CaronFlip = s.CaronFlip,
-            AcuteGlyph = SafeCp(s.AcuteCh), AcuteScale = s.AcuteS, AcuteRotate = s.AcuteR, AcuteFlip = s.AcuteFlip
+            CaronWidth = s.CaronW, CaronThickness = s.CaronT * upem,
+            AcuteGlyph = SafeCp(s.AcuteCh), AcuteScale = s.AcuteS, AcuteRotate = s.AcuteR, AcuteFlip = s.AcuteFlip,
+            AcuteWidth = s.AcuteW, AcuteThickness = s.AcuteT * upem
         };
 
         private static int SafeCp(string t)
@@ -225,6 +239,10 @@ namespace FontShelf
             BarTVal.Text = $"{BarTSlider.Value * 100:0}%";
             CaronSVal.Text = $"{CaronSSlider.Value * 100:0}%";
             AcuteSVal.Text = $"{AcuteSSlider.Value * 100:0}%";
+            CaronWVal.Text = $"{CaronWSlider.Value * 100:0}%";
+            AcuteWVal.Text = $"{AcuteWSlider.Value * 100:0}%";
+            CaronTVal.Text = $"{CaronTSlider.Value * 1000:+0;-0;0}";
+            AcuteTVal.Text = $"{AcuteTSlider.Value * 1000:+0;-0;0}";
             CaronRVal.Text = $"{CaronRSlider.Value:+0;-0;0}°";
             AcuteRVal.Text = $"{AcuteRSlider.Value:+0;-0;0}°";
         }
@@ -312,6 +330,7 @@ namespace FontShelf
             OwnDCheck.IsChecked = false;
             CaronBox.Text = ""; AcuteBox.Text = "";
             CaronSSlider.Value = 1; AcuteSSlider.Value = 1; CaronRSlider.Value = 0; AcuteRSlider.Value = 0;
+            CaronWSlider.Value = 1; AcuteWSlider.Value = 1; CaronTSlider.Value = 0; AcuteTSlider.Value = 0;
             CaronFlipCheck.IsChecked = false; AcuteFlipCheck.IsChecked = false;
             _ready = true;
             Regenerate();
@@ -447,6 +466,7 @@ namespace FontShelf
         public void GoForTest(int delta) => Go(delta);
         public void SetManualForTest(string caron, double cs, double cr, string acute, double asc, double ar)
         {
+            CaronWSlider.Value = 1.4; CaronTSlider.Value = 0.03; AcuteWSlider.Value = 0.8; AcuteTSlider.Value = 0.02;
             CaronBox.Text = caron; CaronSSlider.Value = cs; CaronRSlider.Value = cr;
             AcuteBox.Text = acute; AcuteSSlider.Value = asc; AcuteRSlider.Value = ar;
         }

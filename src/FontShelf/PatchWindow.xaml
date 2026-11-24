@@ -64,48 +64,86 @@
                                Foreground="{DynamicResource SubTextBrush}" VerticalAlignment="Center"/>
                 </Grid>
 
-                <TextBlock Text="Ručni odabir znaka (kad font nema kvačicu ili akcent)" Style="{StaticResource DetailTitle}" Margin="0,18,0,4"/>
+                <TextBlock Text="Oblik i ručni odabir znaka za kvačicu i akcent" Style="{StaticResource DetailTitle}" Margin="0,18,0,4"/>
                 <TextBlock Foreground="{DynamicResource SubTextBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"
-                           Text="Upiši bilo koji znak iz fonta koji će glumiti kvačicu ili akcent (npr. v ili ^ za kvačicu, ' , / ili ` za akcent), pa mu podesi veličinu i zakret. Prazno polje = automatski."/>
-                <Grid Margin="0,0,0,6">
+                           Text="Upiši znak ili ga odaberi iz popisa svih znakova fonta (npr. v ili ^ za kvačicu, ' , / ili ` za akcent), pa mu podesi oblik. Prazno polje = automatski."/>
+                <Grid Margin="0,4,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="110"/>
-                        <ColumnDefinition Width="60"/>
-                        <ColumnDefinition Width="70"/>
+                        <ColumnDefinition Width="170"/>
+                        <ColumnDefinition Width="64"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="50"/>
-                        <ColumnDefinition Width="60"/>
+                        <ColumnDefinition Width="52"/>
+                        <ColumnDefinition Width="78"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="50"/>
-                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="52"/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="40"/>
-                        <RowDefinition Height="40"/>
+                        <RowDefinition Height="38"/>
+                        <RowDefinition Height="38"/>
                     </Grid.RowDefinitions>
                     <TextBlock Text="Kvačica (č š ž)" VerticalAlignment="Center"/>
-                    <TextBox x:Name="CaronBox" Grid.Column="1" MaxLength="2" Width="46" Height="30" HorizontalAlignment="Left"
-                             TextAlignment="Center" VerticalContentAlignment="Center" FontSize="15" TextChanged="Glyph_Changed"/>
-                    <TextBlock Grid.Column="2" Text="Veličina" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
-                    <Slider x:Name="CaronSSlider" Grid.Column="3" Minimum="0.2" Maximum="1.8" Value="1" IsMoveToPointEnabled="True" ValueChanged="Option_Changed"/>
-                    <TextBlock x:Name="CaronSVal" Grid.Column="4" TextAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
-                    <TextBlock Grid.Column="5" Text="Zakret" Margin="14,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
-                    <Slider x:Name="CaronRSlider" Grid.Column="6" Minimum="-90" Maximum="90" Value="0" IsMoveToPointEnabled="True" ValueChanged="Option_Changed"/>
-                    <TextBlock x:Name="CaronRVal" Grid.Column="7" TextAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
-                    <CheckBox x:Name="CaronFlipCheck" Grid.Column="8" Style="{StaticResource Switch}" Content="Naopako" Margin="16,0,0,0"
-                              VerticalAlignment="Center" Checked="Check_Changed" Unchecked="Check_Changed"/>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBox x:Name="CaronBox" MaxLength="2" Width="46" Height="30" TextAlignment="Center"
+                                 VerticalContentAlignment="Center" FontSize="15" TextChanged="Glyph_Changed"/>
+                        <Button Style="{StaticResource ActionButton}" Content="Odaberi…" Height="30" Padding="12,0" Margin="8,0,0,0"
+                                Tag="Caron" Click="PickGlyph_Click"/>
+                    </StackPanel>
+                    <CheckBox x:Name="CaronFlipCheck" Grid.Row="1" Grid.Column="1" Style="{StaticResource Switch}" Content="Okreni naopako"
+                              Margin="0,0,24,0" VerticalAlignment="Center" Checked="Check_Changed" Unchecked="Check_Changed"/>
 
-                    <TextBlock Grid.Row="1" Text="Akcent (ć)" VerticalAlignment="Center"/>
-                    <TextBox x:Name="AcuteBox" Grid.Row="1" Grid.Column="1" MaxLength="2" Width="46" Height="30" HorizontalAlignment="Left"
-                             TextAlignment="Center" VerticalContentAlignment="Center" FontSize="15" TextChanged="Glyph_Changed"/>
-                    <TextBlock Grid.Row="1" Grid.Column="2" Text="Veličina" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
-                    <Slider x:Name="AcuteSSlider" Grid.Row="1" Grid.Column="3" Minimum="0.2" Maximum="1.8" Value="1" IsMoveToPointEnabled="True" ValueChanged="Option_Changed"/>
-                    <TextBlock x:Name="AcuteSVal" Grid.Row="1" Grid.Column="4" TextAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
-                    <TextBlock Grid.Row="1" Grid.Column="5" Text="Zakret" Margin="14,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
-                    <Slider x:Name="AcuteRSlider" Grid.Row="1" Grid.Column="6" Minimum="-90" Maximum="90" Value="0" IsMoveToPointEnabled="True" ValueChanged="Option_Changed"/>
-                    <TextBlock x:Name="AcuteRVal" Grid.Row="1" Grid.Column="7" TextAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
-                    <CheckBox x:Name="AcuteFlipCheck" Grid.Row="1" Grid.Column="8" Style="{StaticResource Switch}" Content="Naopako" Margin="16,0,0,0"
-                              VerticalAlignment="Center" Checked="Check_Changed" Unchecked="Check_Changed"/>
+                    <TextBlock Grid.Column="2" Text="Veličina" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <Slider x:Name="CaronSSlider" Grid.Column="3" Minimum="0.2" Maximum="2.5" Value="1" IsMoveToPointEnabled="True" ValueChanged="Option_Changed"/>
+                    <TextBlock x:Name="CaronSVal" Grid.Column="4" TextAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <TextBlock Grid.Column="5" Text="Širina" Margin="16,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <Slider x:Name="CaronWSlider" Grid.Column="6" Minimum="0.3" Maximum="2.5" Value="1" IsMoveToPointEnabled="True" ValueChanged="Option_Changed"/>
+                    <TextBlock x:Name="CaronWVal" Grid.Column="7" TextAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="2" Text="Zakret" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <Slider x:Name="CaronRSlider" Grid.Row="1" Grid.Column="3" Minimum="-90" Maximum="90" Value="0" IsMoveToPointEnabled="True" ValueChanged="Option_Changed"/>
+                    <TextBlock x:Name="CaronRVal" Grid.Row="1" Grid.Column="4" TextAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <TextBlock Grid.Row="1" Grid.Column="5" Text="Debljina" Margin="16,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <Slider x:Name="CaronTSlider" Grid.Row="1" Grid.Column="6" Minimum="-0.04" Maximum="0.08" Value="0" IsMoveToPointEnabled="True" ValueChanged="Option_Changed"/>
+                    <TextBlock x:Name="CaronTVal" Grid.Row="1" Grid.Column="7" TextAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                </Grid>
+                <Grid Margin="0,4,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="110"/>
+                        <ColumnDefinition Width="170"/>
+                        <ColumnDefinition Width="64"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="52"/>
+                        <ColumnDefinition Width="78"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="52"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="38"/>
+                        <RowDefinition Height="38"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Akcent (ć)" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBox x:Name="AcuteBox" MaxLength="2" Width="46" Height="30" TextAlignment="Center"
+                                 VerticalContentAlignment="Center" FontSize="15" TextChanged="Glyph_Changed"/>
+                        <Button Style="{StaticResource ActionButton}" Content="Odaberi…" Height="30" Padding="12,0" Margin="8,0,0,0"
+                                Tag="Acute" Click="PickGlyph_Click"/>
+                    </StackPanel>
+                    <CheckBox x:Name="AcuteFlipCheck" Grid.Row="1" Grid.Column="1" Style="{StaticResource Switch}" Content="Okreni naopako"
+                              Margin="0,0,24,0" VerticalAlignment="Center" Checked="Check_Changed" Unchecked="Check_Changed"/>
+
+                    <TextBlock Grid.Column="2" Text="Veličina" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <Slider x:Name="AcuteSSlider" Grid.Column="3" Minimum="0.2" Maximum="2.5" Value="1" IsMoveToPointEnabled="True" ValueChanged="Option_Changed"/>
+                    <TextBlock x:Name="AcuteSVal" Grid.Column="4" TextAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <TextBlock Grid.Column="5" Text="Širina" Margin="16,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <Slider x:Name="AcuteWSlider" Grid.Column="6" Minimum="0.3" Maximum="2.5" Value="1" IsMoveToPointEnabled="True" ValueChanged="Option_Changed"/>
+                    <TextBlock x:Name="AcuteWVal" Grid.Column="7" TextAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="2" Text="Zakret" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <Slider x:Name="AcuteRSlider" Grid.Row="1" Grid.Column="3" Minimum="-90" Maximum="90" Value="0" IsMoveToPointEnabled="True" ValueChanged="Option_Changed"/>
+                    <TextBlock x:Name="AcuteRVal" Grid.Row="1" Grid.Column="4" TextAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <TextBlock Grid.Row="1" Grid.Column="5" Text="Debljina" Margin="16,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
+                    <Slider x:Name="AcuteTSlider" Grid.Row="1" Grid.Column="6" Minimum="-0.04" Maximum="0.08" Value="0" IsMoveToPointEnabled="True" ValueChanged="Option_Changed"/>
+                    <TextBlock x:Name="AcuteTVal" Grid.Row="1" Grid.Column="7" TextAlignment="Right" VerticalAlignment="Center" Foreground="{DynamicResource SubTextBrush}"/>
                 </Grid>
 
                 <TextBlock Text="Crtica na đ i Đ" Style="{StaticResource DetailTitle}" Margin="0,18,0,8"/>
