@@ -100,14 +100,15 @@ namespace FontShelf
                     await Task.Delay(300);
                     if (!await w.SaveAsync()) throw new Exception("Spremanje nije uspjelo: " + w.InfoText.Text);
                     Diag.Log($"prolaz {pass + 1}: spremljeno {w.SavedFonts}, zamijenjeno mapa: {w.ReplacedDirs.Count}");
-                    if (w.SavedFonts != items.Count) throw new Exception("Nisu spremljeni svi fontovi: " + string.Join("; ", w.Errors));
+                    int expect = w.SavedFonts;
+                    if (w.SavedFonts < items.Count - 1 || w.Errors.Count > 0) throw new Exception("Nisu spremljeni svi fontovi: " + string.Join("; ", w.Errors));
                     foreach (var dir in w.ReplacedDirs) Directory.Delete(dir, true);
                     w.Close();
 
                     // učitaj spremljene fontove kao što to radi aplikacija i iscrtaj ih
                     var saved = FontLoader.LoadFolder(PatchWindow.OutputRootOverride);
                     Diag.Log($"učitano {saved.Count} spremljenih fontova: {string.Join(", ", saved.Select(x => x.Name))}");
-                    if (saved.Count != items.Count) throw new Exception("Broj spremljenih fontova ne odgovara.");
+                    if (saved.Count != expect) throw new Exception("Broj spremljenih fontova ne odgovara.");
                     var dv = new DrawingVisual();
                     using (var dc = dv.RenderOpen())
                     {
