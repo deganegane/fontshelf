@@ -1042,6 +1042,23 @@ namespace FontShelf.ViewModels
             return true;
         }
 
+        /// <summary>Makni iz biblioteke fontove čije su datoteke u zadanoj mapi (mapa se pritom ne dira).</summary>
+        public void DropFontsInDirectory(string dir)
+        {
+            var prefix = dir.TrimEnd('\\', '/') + "\\";
+            var items = _all.Where(f => f.FilePaths != null && f.FilePaths.Count > 0 &&
+                                        f.FilePaths.All(p => p.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))).ToList();
+            if (items.Count == 0) return;
+            foreach (var f in items)
+            {
+                _all.Remove(f);
+                if (f.IsComparing) RemoveFromCompare(f);
+            }
+            if (SelectedFont != null && items.Contains(SelectedFont)) SelectedFont = null;
+            RebuildView();
+            UpdateCounts();
+        }
+
         public async Task RemoveFolderAsync(string path)
         {
             var items = _all.Where(f => string.Equals(f.FolderPath, path, StringComparison.OrdinalIgnoreCase)).ToList();

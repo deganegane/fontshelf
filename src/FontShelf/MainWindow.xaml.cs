@@ -446,7 +446,7 @@ namespace FontShelf
                 if (missing > 0)
                 {
                     menu.Items.Add(new Separator { Margin = new Thickness(8, 4, 8, 4), Background = (System.Windows.Media.Brush)FindResource("LineBrush") });
-                    var mi = Item($"Dodaj čćđšž svima u prikazu ({missing})…", false, () => _ = BatchCroatianAsync());
+                    var mi = Item($"Dodaj čćđšž fontovima u prikazu ({missing})…", false, () => _ = BatchCroatianAsync());
                     mi.Tag = "\uE70F";
                     menu.Items.Add(mi);
                 }
@@ -601,36 +601,18 @@ namespace FontShelf
             catch { }
         }
 
-        private async Task BatchCroatianAsync()
+        public void ClearSelectionAfterError()
+        {
+            _vm.SelectedFont = null;
+            _vm.StatusText = "Odabrani font nije moguće prikazati.";
+        }
+
+        private Task BatchCroatianAsync()
         {
             var fonts = _vm.FontsView.Cast<FontItem>().Where(f => f.MissingCroatian).ToList();
-            if (fonts.Count == 0) return;
-            var ok = MessageBox.Show(this,
-                $"Za {Plural.Fonts(fonts.Count)} bez hrvatskih znakova napravit ću kopije s dodanim č ć đ š ž (zadane postavke).\n\n" +
-                "Originali ostaju netaknuti, a kopije se spremaju u mapu „Hrvatski fontovi”. Varijabilni fontovi i kolekcije (.ttc) bit će preskočeni.",
-                "Dodaj hrvatske znakove", MessageBoxButton.OKCancel, MessageBoxImage.Question);
-            if (ok != MessageBoxResult.OK) return;
-
-            _vm.IsBusy = true;
-            int done = 0, skipped = 0;
-            var opts = new PatchOptions();
-            try
-            {
-                for (int i = 0; i < fonts.Count; i++)
-                {
-                    var f = fonts[i];
-                    _vm.StatusText = $"Dodajem hrvatske znakove… {i + 1}/{fonts.Count}: {f.Name}";
-                    Diag.Log("skupno: " + f.Name);
-                    var files = FontAnalyzer.AllFiles(f).Where(File.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-                    var (fam, saved, _) = await Task.Run(() => PatchWindow.PatchFiles(files, opts));
-                    if (saved > 0) done++; else skipped++;
-                }
-                if (done > 0) await _vm.ReloadFolderAsync(PatchWindow.OutputRoot);
-            }
-            finally { _vm.IsBusy = false; }
-            _vm.StatusText = skipped == 0
-                ? $"Gotovo: {Plural.Fonts(done)} s hrvatskim znakovima u mapi „Hrvatski fontovi”."
-                : $"Gotovo: {Plural.Fonts(done)} dodano, {skipped} preskočeno (varijabilni, .ttc ili oštećeni).";
+            if (fonts.Count == 0) return Task.CompletedTask;
+            int start = _vm.SelectedFont != null ? Math.Max(0, fonts.IndexOf(_vm.SelectedFont)) : 0;
+            return RunPatchWindowAsync(new PatchWindow(fonts, start) { Owner = this });
         }
 
         private async void AddCroatian_Click(object sender, RoutedEventArgs e)
@@ -638,17 +620,33 @@ namespace FontShelf
             var font = _vm.SelectedFont;
             if (font == null) return;
             Diag.Log("Dodaj čćđšž: " + font.Name);
-            var win = new PatchWindow(font) { Owner = this };
-            if (win.ShowDialog() != true || string.IsNullOrEmpty(win.SavedFamily)) return;
+            await RunPatchWindowAsync(new PatchWindow(font) { Owner = this });
+        }
+
+        private async Task RunPatchWindowAsync(PatchWindow win)
+        {
+            if (win.ShowDialog() != true || win.SavedFonts == 0) return;
             try
             {
+                // stare inačice istih fontova makni iz biblioteke i s diska (ako se mogu obrisati)
+                foreach (var dir in win.ReplacedDirs)
+                {
+                    _vm.DropFontsInDirectory(dir);
+                    try { Directory.Delete(dir, true); }
+                    catch
+                    {
+                        try { File.WriteAllText(Path.Combine(dir, FontLoader.ReplacedMarker), "Zamijenjeno novijom inačicom; mapu možeš obrisati."); } catch { }
+                    }
+                }
                 Diag.Log("ponovno učitavam " + PatchWindow.OutputRoot);
-                System.IO.Directory.CreateDirectory(PatchWindow.OutputRoot);
+                Directory.CreateDirectory(PatchWindow.OutputRoot);
                 await _vm.ReloadFolderAsync(PatchWindow.OutputRoot);
                 Diag.Log("odabirem " + win.SavedFamily);
                 _vm.SelectFontByName(win.SavedFamily);
                 Diag.Log("gotovo");
-                _vm.StatusText = $"Spremljeno: {win.SavedFamily} (u mapi „Hrvatski fontovi”)";
+                _vm.StatusText = win.SavedFonts == 1
+                    ? $"Spremljeno: {win.SavedFamily} (u mapi „Hrvatski fontovi”)"
+                    : $"Spremljeno: {Plural.Fonts(win.SavedFonts)} s hrvatskim znakovima (u mapi „Hrvatski fontovi”)";
             }
             catch (Exception ex)
             {

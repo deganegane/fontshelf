@@ -59,18 +59,18 @@ jobs:
         shell: pwsh
         run: |
           $fail = $false
-          foreach ($name in @("SourceSans3-Regular.otf","SourceSerif4-It.otf","SourceHanSansKR-Regular.otf","ABeeZee-Regular.ttf","Abel-Regular.ttf")) {
-            $src = (Resolve-Path "test/$name").Path
-            $dir = Join-Path (Resolve-Path test).Path ("ui/" + [IO.Path]::GetFileNameWithoutExtension($name))
-            New-Item -ItemType Directory -Force $dir | Out-Null
-            $p = Start-Process -FilePath out/FontShelf.exe -ArgumentList @("--ui-test", "`"$src`"", "`"$dir`"") -PassThru
-            if (-not $p.WaitForExit(180000)) { Write-Host "$name : ISTEKLO VRIJEME"; $p.Kill(); $fail = $true }
-            Write-Host "===== $name : izlaz $($p.ExitCode)"
-            if (Test-Path "$dir/trace.log") { Get-Content "$dir/trace.log" }
-            if (Test-Path "$dir/crash.log") { Get-Content "$dir/crash.log"; $fail = $true }
-            if ($p.ExitCode -ne 0) { $fail = $true }
-            Get-ChildItem "$dir/*.png" | ForEach-Object { Copy-Item $_ ("test/out/ui-" + $_.Name) }
-          }
+          $srcDir = Join-Path (Resolve-Path test).Path "ui-src"
+          New-Item -ItemType Directory -Force $srcDir | Out-Null
+          foreach ($name in @("SourceSans3-Regular.otf","SourceSerif4-It.otf","SourceCodePro-Bold.otf","ABeeZee-Regular.ttf","ABeeZee-Italic.ttf","Abel-Regular.ttf","Aclonica-Regular.ttf")) { Copy-Item "test/$name" $srcDir }
+          $dir = Join-Path (Resolve-Path test).Path "ui"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $p = Start-Process -FilePath out/FontShelf.exe -ArgumentList @("--ui-test", "`"$srcDir`"", "`"$dir`"") -PassThru
+          if (-not $p.WaitForExit(240000)) { Write-Host "ISTEKLO VRIJEME"; $p.Kill(); $fail = $true }
+          Write-Host "===== izlaz $($p.ExitCode)"
+          if (Test-Path "$dir/trace.log") { Get-Content "$dir/trace.log" | Where-Object { $_ -notmatch "pregled|patch |spremljeno C|spremljeno D" } }
+          if (Test-Path "$dir/crash.log") { Get-Content "$dir/crash.log"; $fail = $true }
+          if ($p.ExitCode -ne 0) { $fail = $true }
+          Get-ChildItem "$dir/*.png" | ForEach-Object { Copy-Item $_ ("test/out/ui-" + $_.Name) }
           if ($fail) { exit 1 }
 
       - name: Spremi rezultate testa

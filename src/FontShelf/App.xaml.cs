@@ -59,61 +59,77 @@ namespace FontShelf
         /// Automatski test cijelog postupka kroz sučelje: učita font iz mape, otvori prozor za
         /// hrvatske znakove, pomiče klizače, spremi i zatim iscrta spremljene fontove u PNG.
         /// </summary>
-        private async Task UiTestAsync(string fontFile, string outDir)
+        private async Task UiTestAsync(string srcDir, string outDir)
         {
             int code = 0;
             try
             {
                 Directory.CreateDirectory(outDir);
-                var src = Path.Combine(outDir, "src-" + Path.GetFileNameWithoutExtension(fontFile));
-                Directory.CreateDirectory(src);
-                File.Copy(fontFile, Path.Combine(src, Path.GetFileName(fontFile)), true);
-                var items = FontLoader.LoadFolder(src);
-                Diag.Log($"učitano {items.Count} fontova iz {src}");
-                if (items.Count == 0) throw new Exception("Font se ne može učitati.");
-                PatchWindow.OutputRootOverride = Path.Combine(outDir, "hr");
-                var w = new PatchWindow(items[0]);
-                w.Show();
-                for (int i = 0; i < 100 && !w.IsReady; i++) await Task.Delay(100);
-                if (!w.IsReady) throw new Exception("Prozor nije spreman: " + w.InfoText.Text);
-                foreach (var (g, y, b) in new[] { (0.05, 0.05, 1.3), (-0.05, -0.1, 0.7), (0.0, 0.0, 1.0) })
+                var items = FontLoader.LoadFolder(srcDir);
+                Diag.Log($"učitano {items.Count} fontova iz {srcDir}");
+                foreach (var it in items)
                 {
-                    w.SetForTest(g, y, b);
-                    await Task.Delay(600);
+                    var fs = FontAnalyzer.AllFiles(it);
+                    Diag.Log($"  {it.Name}: {string.Join(" | ", fs.Select(Path.GetFileName))}");
+                    if (fs.Count != it.Styles.Select(x => x.FilePath).Where(x => x != null).Distinct(StringComparer.OrdinalIgnoreCase).Count())
+                        throw new Exception($"Font {it.Name} ima krivi popis datoteka ({fs.Count}).");
                 }
-                Diag.Log("info: " + w.InfoText.Text.Replace("\n", " / "));
-                if (!await w.SaveAsync()) throw new Exception("Spremanje nije uspjelo: " + w.InfoText.Text);
-                w.Close();
+                int fileCount = Directory.GetFiles(srcDir).Count(f => f.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".otf", StringComparison.OrdinalIgnoreCase));
+                if (items.Count == 0 || items.Sum(i => FontAnalyzer.AllFiles(i).Count) != fileCount)
+                    throw new Exception($"Datoteke nisu ispravno raspoređene po fontovima ({items.Sum(i => FontAnalyzer.AllFiles(i).Count)} / {fileCount}).");
+                PatchWindow.OutputRootOverride = Path.Combine(outDir, "hr");
 
-                // učitaj spremljene fontove kao što to radi aplikacija i iscrtaj ih
-                var saved = FontLoader.LoadFolder(PatchWindow.OutputRootOverride);
-                Diag.Log($"spremljeno, učitano {saved.Count} fontova: {string.Join(", ", saved.Select(x => x.Name))}");
-                foreach (var it in saved)
+                // dva prolaza: drugi sprema iste fontove ponovno (zamjena postojećih mapa)
+                for (int pass = 0; pass < 2; pass++)
                 {
-                    var analysis = FontAnalyzer.AllFiles(it);
+                    var w = new PatchWindow(items, 0);
+                    w.Show();
+                    for (int n = 0; n < items.Count; n++)
+                    {
+                        for (int i = 0; i < 100 && !w.IsReady; i++) await Task.Delay(100);
+                        Diag.Log($"font {w.Index + 1}/{items.Count}: {w.TitleText.Text} — {w.InfoText.Text.Replace("\n", " / ")}");
+                        if (!w.IsReady) throw new Exception("Prozor nije spreman: " + w.InfoText.Text);
+                        foreach (var (g, x, y, b, own) in new[] { (0.05, 0.08, 0.2, 1.3, true), (-0.05, -0.08, -0.2, 0.7, false), (0.0, pass * 0.03, 0.0, 1.0, pass == 1) })
+                        {
+                            w.SetForTest(g, x, y, b, own);
+                            await Task.Delay(450);
+                        }
+                        if (n < items.Count - 1) w.GoForTest(1);
+                    }
+                    w.GoForTest(-1);
+                    await Task.Delay(300);
+                    if (!await w.SaveAsync()) throw new Exception("Spremanje nije uspjelo: " + w.InfoText.Text);
+                    Diag.Log($"prolaz {pass + 1}: spremljeno {w.SavedFonts}, zamijenjeno mapa: {w.ReplacedDirs.Count}");
+                    if (w.SavedFonts != items.Count) throw new Exception("Nisu spremljeni svi fontovi: " + string.Join("; ", w.Errors));
+                    foreach (var dir in w.ReplacedDirs) Directory.Delete(dir, true);
+                    w.Close();
+
+                    // učitaj spremljene fontove kao što to radi aplikacija i iscrtaj ih
+                    var saved = FontLoader.LoadFolder(PatchWindow.OutputRootOverride);
+                    Diag.Log($"učitano {saved.Count} spremljenih fontova: {string.Join(", ", saved.Select(x => x.Name))}");
+                    if (saved.Count != items.Count) throw new Exception("Broj spremljenih fontova ne odgovara.");
                     var dv = new DrawingVisual();
                     using (var dc = dv.RenderOpen())
                     {
-                        dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, 1000, 220));
+                        dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, 1100, 80 * saved.Count + 20));
                         int k = 0;
-                        foreach (var st in it.Styles.Take(3))
+                        foreach (var it in saved)
                         {
+                            var st = it.Styles[0];
                             var tf = new Typeface(st.Family, st.Style, st.Weight, st.Stretch);
                             var ft = new FormattedText("čćšžđ ČĆŠŽĐ Gojazni đačić", System.Globalization.CultureInfo.InvariantCulture,
                                 FlowDirection.LeftToRight, tf, 48, Brushes.Black, 1.0);
-                            dc.DrawText(ft, new Point(10, 10 + 68 * k++));
+                            dc.DrawText(ft, new Point(10, 10 + 80 * k++));
                             if (tf.TryGetGlyphTypeface(out var gt))
                                 foreach (var ch in "čćšžđČĆŠŽĐ")
                                     if (gt.CharacterToGlyphMap.TryGetValue(ch, out var gi)) gt.GetGlyphOutline(gi, 48, 48);
                         }
                     }
-                    var bmp = new RenderTargetBitmap(1000, 220, 96, 96, PixelFormats.Pbgra32);
+                    var bmp = new RenderTargetBitmap(1100, 80 * saved.Count + 20, 96, 96, PixelFormats.Pbgra32);
                     bmp.Render(dv);
                     var enc = new PngBitmapEncoder();
                     enc.Frames.Add(BitmapFrame.Create(bmp));
-                    var png = Path.Combine(outDir, "wpf-" + string.Concat(it.Name.Split(Path.GetInvalidFileNameChars())) + ".png");
-                    using (var fs = File.Create(png)) enc.Save(fs);
-                    Diag.Log("iscrtano " + png);
+                    using (var fs2 = File.Create(Path.Combine(outDir, $"wpf-prolaz{pass + 1}.png"))) enc.Save(fs2);
                 }
                 Diag.Log("UI TEST U REDU");
             }
@@ -125,12 +141,26 @@ namespace FontShelf
             Shutdown(code);
         }
 
+        private DateTime _lastBox = DateTime.MinValue;
+        private int _burst;
+
         private void OnUnhandled(object sender, DispatcherUnhandledExceptionEventArgs e)
         {
             Diag.Crash("Dispatcher", e.Exception);
+            e.Handled = true;
+            // Greška pri crtanju fonta ponavlja se pri svakom osvježavanju: makni odabir da se petlja prekine
+            // i ne zatrpavaj korisnika porukama.
+            var now = DateTime.Now;
+            _burst = (now - _lastBox).TotalSeconds < 3 ? _burst + 1 : 0;
+            if (_burst >= 1)
+            {
+                try { (MainWindow as MainWindow)?.ClearSelectionAfterError(); } catch { }
+                if (_burst > 1) return;
+            }
+            _lastBox = now;
             MessageBox.Show("Dogodila se greška:\n\n" + e.Exception.Message, "FontShelf",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
-            e.Handled = true;
+            _lastBox = DateTime.Now;
         }
     }
 }

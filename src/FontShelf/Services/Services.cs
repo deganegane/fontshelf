@@ -435,6 +435,8 @@ namespace FontShelf.Services
             return list;
         }
 
+        public const string ReplacedMarker = "_zamijenjeno.txt";
+
         public static List<FontItem> LoadFolder(string folder)
         {
             var list = new List<FontItem>();
@@ -454,32 +456,63 @@ namespace FontShelf.Services
             // Grupiraj datoteke po (podmapa, obitelj) da npr. Roboto-Regular i Roboto-Bold budu jedan font
             var groups = new Dictionary<(string dir, string name), (List<string> files, Dictionary<string, string> styles)>();
             var order = new List<(string dir, string name)>();
+            // WPF za jednu datoteku zna vratiti sve obitelji iz cijele mape, pa se pripadnost
+            // datoteke obitelji utvrđuje preko stvarne datoteke svakog stila.
+            var known = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var f in files) known[f] = f;
+            var covered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var file in files)
             {
-                var dir = Path.GetDirectoryName(file);
+                if (File.Exists(Path.Combine(Path.GetDirectoryName(file) ?? "", ReplacedMarker))) continue;
+                if (covered.Contains(file)) continue;
+                var touched = new List<(List<string> files, Dictionary<string, string> styles)>();
                 foreach (var fam in SafeFamilies(file))
                 {
                     var name = GetName(fam);
                     if (string.IsNullOrWhiteSpace(name)) continue;
-                    var k = (dir, name);
-                    if (!groups.TryGetValue(k, out var g))
-                    {
-                        g = (new List<string>(), new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
-                        groups[k] = g;
-                        order.Add(k);
-                    }
-                    if (!g.files.Contains(file)) g.files.Add(file);
                     try
                     {
                         foreach (var tf in fam.GetTypefaces())
                         {
-                            var sn = FaceName(tf);
-                            if (!g.styles.ContainsKey(sn)) g.styles[sn] = file;
+                            string real = null;
+                            try
+                            {
+                                if (tf.TryGetGlyphTypeface(out var gt))
+                                {
+                                    var p = FontAnalyzer.FileOf(gt);
+                                    if (p != null && known.TryGetValue(p, out var r)) real = r;
+                                }
+                            }
+                            catch { }
+                            var owner = real ?? file;
+                            var k = (Path.GetDirectoryName(owner), name);
+                            if (!groups.TryGetValue(k, out var g))
+                            {
+                                g = (new List<string>(), new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+                                groups[k] = g;
+                                order.Add(k);
+                            }
+                            if (real != null)
+                            {
+                                if (!g.files.Contains(real, StringComparer.OrdinalIgnoreCase)) g.files.Add(real);
+                                covered.Add(real);
+                                var sn = FaceName(tf);
+                                if (!g.styles.ContainsKey(sn)) g.styles[sn] = real;
+                            }
+                            else touched.Add(g);
                         }
                     }
                     catch { }
                 }
+                if (!covered.Contains(file))
+                {
+                    // datoteku nije bilo moguće povezati sa stilom: pripiši je obiteljima bez datoteka
+                    foreach (var g in touched)
+                        if (g.files.Count == 0) g.files.Add(file);
+                    covered.Add(file);
+                }
             }
+            order = order.Where(k => groups[k].files.Count > 0).ToList();
 
             foreach (var k in order)
             {

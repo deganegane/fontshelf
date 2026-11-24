@@ -13,6 +13,9 @@ namespace FontShelf.Services
         public double BarWidthScale { get; set; } = 1.0;
         public double BarThicknessScale { get; set; } = 1.0;
         public double AccentGap { get; set; }        // dodatni razmak kvačica/akcenta od slova (jedinice)
+        public double AccentShiftX { get; set; }     // pomak kvačica/akcenta lijevo-desno (jedinice)
+        public double BarShiftYUpper { get; set; }   // pomak crtice na Đ gore-dolje (jedinice)
+        public bool UseEth { get; set; } = true;     // Đ = postojeće Ð ako ga font ima
         public string Suffix { get; set; } = "HR";
         public bool Rename { get; set; } = true;
     }
@@ -593,7 +596,7 @@ namespace FontShelf.Services
 
                 if (kind == Kind.Bar)
                 {
-                    if (upper && ethG > 0)
+                    if (upper && ethG > 0 && o.UseEth)
                     {
                         newCmap[cp] = ethG; // Đ izgleda isto kao Ð
                         res.Added.Add(label);
@@ -604,7 +607,7 @@ namespace FontShelf.Services
                     if (hb.W <= 0 || hb.H <= 0) { res.Skipped.Add(label + " (neispravna crtica)"); continue; }
 
                     double cy = upper ? capHeight * 0.5 : xHeight + (bb.YMax - xHeight) * 0.52;
-                    cy += o.BarShiftY;
+                    cy += upper ? o.BarShiftYUpper : o.BarShiftY;
                     // pronađi stupac slova na visini crtice
                     double stemA = double.NaN, stemB = double.NaN;
                     var poly = Poly(baseG);
@@ -641,7 +644,7 @@ namespace FontShelf.Services
                     double dy = src.Dy + src.Lift + o.AccentGap;
                     double floor = bb.YMax + upem * 0.01;
                     if (bottom < floor) dy += floor - bottom;
-                    double dx = src.Dx + bb.CX - src.BaseCX + slant * (dy - src.Dy);
+                    double dx = src.Dx + bb.CX - src.BaseCX + slant * (dy - src.Dy) + o.AccentShiftX;
                     comps.Add((src.Gid, (int)Math.Round(dx), (int)Math.Round(dy), 1, 1, false));
                 }
                 else
@@ -661,7 +664,7 @@ namespace FontShelf.Services
                     if (need > 0) dy += need;
                     else dy += o.AccentGap;
                     double finalBottom = accBottom + dy - flipDy;
-                    double dx = bb.CX - ab.CX + slant * (finalBottom - bb.YMax / 2.0);
+                    double dx = bb.CX - ab.CX + slant * (finalBottom - bb.YMax / 2.0) + o.AccentShiftX;
                     comps.Add((accG, (int)Math.Round(dx), (int)Math.Round(dy), 1, sy, false));
                 }
 
