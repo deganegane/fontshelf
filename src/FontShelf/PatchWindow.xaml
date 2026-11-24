@@ -195,6 +195,35 @@
                           Content="Veliko Đ složi od D i crtice (ne koristi gotovi Ð)"
                           Checked="Check_Changed" Unchecked="Check_Changed"/>
 
+                <!-- pojedino slovo -->
+                <TextBlock Text="Fino podešavanje jednog slova" Style="{StaticResource DetailTitle}" Margin="0,20,0,4"/>
+                <TextBlock Foreground="{DynamicResource SubTextBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"
+                           Text="Odaberi slovo pa pomakni samo njegovu kvačicu, akcent ili crticu. Dodaje se na opće postavke iznad."/>
+                <WrapPanel x:Name="PerLetterPanel" Margin="0,0,0,6">
+                    <RadioButton Style="{StaticResource SegmentButton}" GroupName="PerGlyph" Content="č" Tag="č" MinWidth="36" FontSize="15" IsChecked="True" Checked="PerLetter_Checked"/>
+                    <RadioButton Style="{StaticResource SegmentButton}" GroupName="PerGlyph" Content="ć" Tag="ć" MinWidth="36" FontSize="15" Checked="PerLetter_Checked"/>
+                    <RadioButton Style="{StaticResource SegmentButton}" GroupName="PerGlyph" Content="š" Tag="š" MinWidth="36" FontSize="15" Checked="PerLetter_Checked"/>
+                    <RadioButton Style="{StaticResource SegmentButton}" GroupName="PerGlyph" Content="ž" Tag="ž" MinWidth="36" FontSize="15" Checked="PerLetter_Checked"/>
+                    <RadioButton Style="{StaticResource SegmentButton}" GroupName="PerGlyph" Content="đ" Tag="đ" MinWidth="36" FontSize="15" Checked="PerLetter_Checked"/>
+                    <RadioButton Style="{StaticResource SegmentButton}" GroupName="PerGlyph" Content="Č" Tag="Č" MinWidth="36" FontSize="15" Checked="PerLetter_Checked"/>
+                    <RadioButton Style="{StaticResource SegmentButton}" GroupName="PerGlyph" Content="Ć" Tag="Ć" MinWidth="36" FontSize="15" Checked="PerLetter_Checked"/>
+                    <RadioButton Style="{StaticResource SegmentButton}" GroupName="PerGlyph" Content="Š" Tag="Š" MinWidth="36" FontSize="15" Checked="PerLetter_Checked"/>
+                    <RadioButton Style="{StaticResource SegmentButton}" GroupName="PerGlyph" Content="Ž" Tag="Ž" MinWidth="36" FontSize="15" Checked="PerLetter_Checked"/>
+                    <RadioButton Style="{StaticResource SegmentButton}" GroupName="PerGlyph" Content="Đ" Tag="Đ" MinWidth="36" FontSize="15" Checked="PerLetter_Checked"/>
+                </WrapPanel>
+                <Grid Style="{StaticResource Row}">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="56"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Lijevo / desno" Style="{StaticResource RowLabel}"/>
+                    <Slider x:Name="PerXSlider" Grid.Column="1" Minimum="-0.3" Maximum="0.3" Value="0" IsMoveToPointEnabled="True" ValueChanged="PerLetter_Changed"/>
+                    <TextBlock x:Name="PerXVal" Grid.Column="2" Style="{StaticResource RowValue}"/>
+                </Grid>
+                <Grid Style="{StaticResource Row}">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="56"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Gore / dolje" Style="{StaticResource RowLabel}"/>
+                    <Slider x:Name="PerYSlider" Grid.Column="1" Minimum="-0.3" Maximum="0.3" Value="0" IsMoveToPointEnabled="True" ValueChanged="PerLetter_Changed"/>
+                    <TextBlock x:Name="PerYVal" Grid.Column="2" Style="{StaticResource RowValue}"/>
+                </Grid>
+
                 <TextBlock Foreground="{DynamicResource SubTextBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,14,0,0"
                            Text="Original se ne mijenja — sprema se kopija s „HR” u imenu i dodaje u biblioteku."/>
             </StackPanel>

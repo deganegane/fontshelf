@@ -30,6 +30,8 @@ namespace FontShelf.Services
         public double CaronThickness { get; set; }
         public double AcuteWidth { get; set; } = 1.0;
         public double AcuteThickness { get; set; }
+        /// <summary>Dodatni pomak (jedinice fonta) samo za pojedini znak, npr. 0x0106 (Ć) ili 0x0111 (đ).</summary>
+        public Dictionary<int, (double dx, double dy)> PerGlyph { get; set; } = new Dictionary<int, (double dx, double dy)>();
         public string Suffix { get; set; } = "HR";
         public bool Rename { get; set; } = true;
     }
@@ -684,6 +686,7 @@ namespace FontShelf.Services
 
                     double cy = upper ? capHeight * 0.5 : xHeight + (bb.YMax - xHeight) * 0.52;
                     cy += upper ? o.BarShiftYUpper : o.BarShiftY;
+                    if (o.PerGlyph != null && o.PerGlyph.TryGetValue(cp, out var pgb)) cy += pgb.dy;
                     // pronađi stupac slova na visini crtice
                     double stemA = double.NaN, stemB = double.NaN;
                     var poly = Poly(baseG);
@@ -707,6 +710,7 @@ namespace FontShelf.Services
                     double width = (upper ? Math.Max(stemW * 2.2, upem * 0.16) : Math.Max(stemW * 2.6, upem * 0.2)) * o.BarWidthScale;
                     double cx = upper ? stemC + stemW * 0.35 : stemC - stemW * 0.15;
                     cx += o.BarShiftX;
+                    if (o.PerGlyph != null && o.PerGlyph.TryGetValue(cp, out var pgx)) cx += pgx.dx;
                     if (synth) { hbW = width; hbH = Math.Max(stemW * 0.7, upem * 0.025); hbCX = hbW / 2; hbCY = hbH / 2; }
                     double sx = Math.Min(1.99, Math.Max(0.05, width / hbW));
                     double sy = Math.Min(1.99, Math.Max(0.2, o.BarThicknessScale));
@@ -791,6 +795,12 @@ namespace FontShelf.Services
                     double finalBottom = accBottom + dy - flipDy;
                     double dx = bb.CX - ab.CX + slant * (finalBottom - bb.YMax / 2.0) + o.AccentShiftX;
                     comps.Add((accG, (int)Math.Round(dx), (int)Math.Round(dy), 1, sy, false, 0, 0));
+                }
+
+                if (kind != Kind.Bar && comps.Count > 1 && o.PerGlyph != null && o.PerGlyph.TryGetValue(cp, out var pg))
+                {
+                    var c0 = comps[comps.Count - 1];
+                    comps[comps.Count - 1] = (c0.gid, c0.dx + (int)Math.Round(pg.dx), c0.dy + (int)Math.Round(pg.dy), c0.sx, c0.sy, c0.metrics, c0.m01, c0.m10);
                 }
 
                 int ng;

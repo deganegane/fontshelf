@@ -29,6 +29,7 @@ namespace FontShelf
             public double CaronS = 1, AcuteS = 1, CaronR, AcuteR, CaronW = 1, AcuteW = 1, CaronT, AcuteT;
             public bool CaronFlip, AcuteFlip;
             public bool Saved;
+            public Dictionary<int, (double x, double y)> Per = new Dictionary<int, (double x, double y)>();
             public bool Include = true;
             public bool Failed;      // font se ne može obraditi (varijabilni, .ttc…)
             public bool Nothing;     // font već ima sve znakove
@@ -101,6 +102,36 @@ namespace FontShelf
         }
 
         private string _caronCh = "", _acuteCh = "";
+        private int _perCp = 0x10D;
+        private bool _perLoading;
+
+        private void LoadPerLetter()
+        {
+            if (PerXSlider == null || PerYSlider == null) return;
+            _perLoading = true;
+            Cur.Per.TryGetValue(_perCp, out var v);
+            PerXSlider.Value = v.x; PerYSlider.Value = v.y;
+            _perLoading = false;
+            PerXVal.Text = $"{v.x * 100:+0;-0;0}%"; PerYVal.Text = $"{v.y * 100:+0;-0;0}%";
+        }
+
+        private void PerLetter_Checked(object sender, RoutedEventArgs e)
+        {
+            var t = (string)((FrameworkElement)sender).Tag;
+            _perCp = char.ConvertToUtf32(t, 0);
+            if (IsLoaded) LoadPerLetter();
+        }
+
+        private void PerLetter_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (!IsLoaded || _perLoading) return;
+            double x = PerXSlider.Value, y = PerYSlider.Value;
+            PerXVal.Text = $"{x * 100:+0;-0;0}%"; PerYVal.Text = $"{y * 100:+0;-0;0}%";
+            if (Math.Abs(x) < 1e-6 && Math.Abs(y) < 1e-6) Cur.Per.Remove(_perCp); else Cur.Per[_perCp] = (x, y);
+            if (!_ready || _loading) return;
+            _debounce.Stop();
+            _debounce.Start();
+        }
 
         private void ShowGlyphBoxes()
         {
@@ -139,6 +170,7 @@ namespace FontShelf
             CaronWSlider.Value = s.CaronW; AcuteWSlider.Value = s.AcuteW;
             CaronTSlider.Value = s.CaronT; AcuteTSlider.Value = s.AcuteT;
             CaronFlipCheck.IsChecked = s.CaronFlip; AcuteFlipCheck.IsChecked = s.AcuteFlip;
+            LoadPerLetter();
             _loading = false;
 
             TitleText.Text = Font.Name;
@@ -240,7 +272,8 @@ namespace FontShelf
             CaronGlyph = SafeCp(s.CaronCh), CaronScale = s.CaronS, CaronRotate = s.CaronR, CaronFlip = s.CaronFlip,
             CaronWidth = s.CaronW, CaronThickness = s.CaronT * upem,
             AcuteGlyph = SafeCp(s.AcuteCh), AcuteScale = s.AcuteS, AcuteRotate = s.AcuteR, AcuteFlip = s.AcuteFlip,
-            AcuteWidth = s.AcuteW, AcuteThickness = s.AcuteT * upem
+            AcuteWidth = s.AcuteW, AcuteThickness = s.AcuteT * upem,
+            PerGlyph = s.Per.ToDictionary(k => k.Key, k => (k.Value.x * upem, k.Value.y * upem))
         };
 
         private static int SafeCp(string t)
@@ -349,6 +382,7 @@ namespace FontShelf
             CaronSSlider.Value = 1; AcuteSSlider.Value = 1; CaronRSlider.Value = 0; AcuteRSlider.Value = 0;
             CaronWSlider.Value = 1; AcuteWSlider.Value = 1; CaronTSlider.Value = 0; AcuteTSlider.Value = 0;
             CaronFlipCheck.IsChecked = false; AcuteFlipCheck.IsChecked = false;
+            Cur.Per.Clear(); LoadPerLetter();
             _ready = true;
             Regenerate();
         }
@@ -487,6 +521,7 @@ namespace FontShelf
             _caronCh = caron; CaronSSlider.Value = cs; CaronRSlider.Value = cr;
             _acuteCh = acute; AcuteSSlider.Value = asc; AcuteRSlider.Value = ar;
             ShowGlyphBoxes();
+            PerXSlider.Value = 0.05; PerYSlider.Value = 0.04;
         }
     }
 }
